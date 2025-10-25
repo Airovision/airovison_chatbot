@@ -4,6 +4,7 @@ from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBy
 import requests
 from PIL import Image
 from googletrans import Translator # 번역 라이브러리
+import re # 라바 답변 줄바꿈
 
 # LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
 _model = None
@@ -93,6 +94,7 @@ def run_llava(image_path: str, question: str):
 
     # 한국어로 번역
     korean_result = translator.translate(english_result, src='en', dest='ko').text
+    formatted_korean = re.sub(r'([.!?])\s+', r'\1\n', korean_result)
     # result = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
     print("----LLaVA 질문 프롬프트----")
     print(prompt_en)
@@ -100,6 +102,6 @@ def run_llava(image_path: str, question: str):
     print(english_result)
 
     print("----LLaVA 답변(kor.ver)----")
-    print(korean_result)
+    print(formatted_korean)
 
-    return korean_result
+    return formatted_korean
