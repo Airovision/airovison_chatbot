@@ -1,3 +1,4 @@
 .env
 airovenv/
 LLaVA/
+__pycache__
