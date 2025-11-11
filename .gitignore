@@ -1,5 +1,6 @@
 .env
 credentials.json
+token.json
 airovenv/
 LLaVA/
 __pycache__
