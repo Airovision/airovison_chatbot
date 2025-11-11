@@ -4,6 +4,7 @@ from discord import app_commands
 from discord.ui import View, Button
 from dotenv import load_dotenv
 from llava import run_llava, load_llava_model
+from record import get_records
 
 load_dotenv()
 
@@ -15,19 +16,14 @@ client = discord.Client(intents=intents)
 
 CHANNEL_ID = 1427293434796048506
 IMAGE_PATH = "images/sample.jpg"
-ALTER_TEXT = "⚠️ 손상 감지 ⚠️\n" \
-"새로운 외벽 손상이 탐지되었습니다. 아래의 정보를 확인하세요.\n" \
-"📍 위치    : 인천 미추홀구 인하로 100, 인하대학교용현캠퍼스 하이테크센터\n" \
-"🕒 감지 시각: 2025-10-13 10:24 AM\n" \
-"🏷️ 손상 유형: 콘크리트 균열\n" \
-"🧠 분석 요약: 창문 왼편에 균열이 의심됩니다. 또한 페인트 벗겨짐 등 일부 손상도 확인됩니다. "
-
 
 # 질문 목록 정리
 questions = {
-    1: "이미지에 나타난 손상의 종류는 무엇인가요?",
-    2: "건물의 손상 정도를 측정할 수 있나요?",
-    3: "이 손상은 얼마나 위험한가요? (1~10 단계로 평가)"
+    1: "이미지에 나타난 손상에 대해 분석 요약해주세요",
+    2: "건물의 손상 정도를 측정해주세요",
+    3: "이 손상의 위험도를 1~10 단계로 평가해주세요",
+    4: "모든 손상 기록을 조회할게요",
+    5: "캘린더에 보수 공사 일정을 추가할게요"
 }
 
 # ✅ 버튼 UI 정의
@@ -66,6 +62,26 @@ class QuestionView(View):
 
         await interaction.followup.send(result)
 
+    @discord.ui.button(label=questions[4], style=discord.ButtonStyle.secondary)
+    async def q4(self, interaction: discord.Interaction, button: Button):
+        await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
+        await interaction.response.defer(thinking=True, ephemeral=False) 
+        
+        try:
+            channel = interaction.channel
+            await get_records(channel)
+        except Exception:
+            await interaction.followup.send("❌ 서버 연결 오류: 손상 기록을 조회할 수 없습니다.")
+    
+    
+    # @discord.ui.button(label=questions[5], style=discord.ButtonStyle.secondary)
+    # async def q5(self, interaction: discord.Interaction, button: Button):
+    #     await interaction.response.send_message(
+    #         content=f"🗓️ 보수 공사를 진행할 일자를 드롭다운 메뉴에서 선택해 주세요.",
+    #         view=ScheduleView(),
+    #         ephemeral=True 
+    #     )
+
 
 @client.event
 async def on_ready():
@@ -83,15 +99,9 @@ async def on_ready():
     if os.path.exists(IMAGE_PATH):
         view = QuestionView()
         file = discord.File(IMAGE_PATH, filename=os.path.basename(IMAGE_PATH))
-        await channel.send(content=f"{ALTER_TEXT}", file=file, view=view)
+        llava_start = run_llava(IMAGE_PATH, None)
+        await channel.send(content=llava_start, file=file, view=view)
     else:
-        await channel.send(f"**질문:** {ALTER_TEXT}\n(⚠️ 이미지 파일을 찾을 수 없습니다: {IMAGE_PATH})")
+        await channel.send(f"**질문:** (⚠️ 이미지 파일을 찾을 수 없습니다: {IMAGE_PATH})")
 
 client.run(discord_key)
-
-
-# test code
-# @client.event
-# async def on_message(message):
-#     if message.content == "핑":
-#         await message.channel.send("퐁")
