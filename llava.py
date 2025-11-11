@@ -13,13 +13,14 @@ _translator = Translator()
 
 def load_llava_model():
     global _model, _processor
+
     if _model is not None and _processor is not None:
         return _model, _processor
 
-    # 1. 모델과 프로세서 준비
+    # 모델과 프로세서 준비
     model_id = "llava-hf/llava-1.5-7b-hf"
 
-    # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
+    # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
     # quantization_config = BitsAndBytesConfig(
     #     load_in_4bit=True,
     #     bnb_4bit_compute_dtype=torch.float16
@@ -27,14 +28,16 @@ def load_llava_model():
 
     # 맥북 gpu용
     device = "mps" if torch.backends.mps.is_available() else "cpu"
+
     # 모델 로드
     print("--- LLaVA 모델 불러오는 중... ---")
+
     _model = LlavaForConditionalGeneration.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
     ).to(device)
 
-    # Processor: fast → 실패 시 slow
+    # Processor : fast → 실패 시 slow
     try:
         _processor = AutoProcessor.from_pretrained(model_id, use_fast=True)
     except Exception:
@@ -45,19 +48,16 @@ def load_llava_model():
     return _model, _processor
 
 
-
-
 def run_llava(image_path: str, question: str):
     """
-    디스코드 챗봇에서 호출용:
+    디스코드 챗봇에서 호출용
     image_path: 분석할 이미지 파일 경로
     question: 버튼으로 받은 한국어 질문
     """
 
     model, processor = load_llava_model()
 
-    # 2. 이미지와 프롬프트 입력받기
-    # ./images/sample.jpg
+    # 이미지와 프롬프트 입력받기
     image = Image.open(image_path)
 
     # 질문 목록 정리
@@ -74,33 +74,29 @@ def run_llava(image_path: str, question: str):
 
     }
 
-
     # llava 입력 포맷
     prompt_en = llava_questions.get(question, question)
     prompt = f"USER: <image>\n{prompt_en} ASSISTANT:"
 
-
-    # 3. 모델 추론 실행
+    # 모델 추론 실행
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     inputs = processor(text=prompt, images=image, return_tensors="pt").to(device)
 
     generate_ids = model.generate(**inputs, max_new_tokens=100) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
-    # 4. 결과 출력
-    # 프롬프트를 제외한 순수 답변 부분만 추출
+    # 결과 출력(프롬프트를 제외한 순수 답변 부분만 추출)
     english_result = english_result_full.split("ASSISTANT:")[-1].strip()
-    translator = Translator()
 
     # 한국어로 번역
-    korean_result = translator.translate(english_result, src='en', dest='ko').text
+    korean_result = _translator.translate(english_result, src='en', dest='ko').text
     formatted_korean = re.sub(r'([.!?])\s+', r'\1\n', korean_result)
+
     # result = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
     print("----LLaVA 질문 프롬프트----")
     print(prompt_en)
     print("----LLaVA 답변(eng.ver)----")
     print(english_result)
-
     print("----LLaVA 답변(kor.ver)----")
     print(formatted_korean)
 
