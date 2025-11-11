@@ -4,6 +4,7 @@ from discord import app_commands
 from discord.ui import View, Button
 from dotenv import load_dotenv
 from llava import run_llava, load_llava_model
+from record import *
 
 load_dotenv()
 
@@ -20,7 +21,9 @@ IMAGE_PATH = "images/sample.jpg"
 questions = {
     1: "이미지에 나타난 손상에 대해 분석 요약해주세요",
     2: "건물의 손상 정도를 측정해주세요",
-    3: "이 손상의 위험도를 1~10 단계로 평가해주세요"
+    3: "이 손상의 위험도를 1~10 단계로 평가해주세요",
+    4: "모든 손상 기록을 조회할게요",
+    5: "캘린더에 보수 공사 일정을 추가할게요"
 }
 
 # ✅ 버튼 UI 정의
@@ -58,6 +61,26 @@ class QuestionView(View):
         result = run_llava(IMAGE_PATH, questions[3])
 
         await interaction.followup.send(result)
+
+    @discord.ui.button(label=questions[4], style=discord.ButtonStyle.secondary)
+    async def q4(self, interaction: discord.Interaction, button: Button):
+        await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
+        await interaction.response.defer(thinking=True, ephemeral=False)
+        try:
+            await get_records(interaction.channel)
+        except Exception as e:
+            await interaction.followup.send(f"❌ 서버 연결 오류: {e}")
+
+    @discord.ui.button(label=questions[5], style=discord.ButtonStyle.secondary)
+    async def q5(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(DateInputModal())
+
+        # 다른 방법) 드롭다운 형식
+        # await interaction.response.send_message(
+        #     content="🗓️ 보수 공사를 진행할 날짜를 선택하세요.",
+        #     view=ScheduleView(),
+        #     ephemeral=True
+        # )
 
 
 @client.event
