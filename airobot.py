@@ -4,7 +4,7 @@ from discord import app_commands
 from discord.ui import View, Button
 from dotenv import load_dotenv
 from llava import run_llava, load_llava_model
-from record import get_records
+from record import *
 
 load_dotenv()
 
@@ -65,22 +65,22 @@ class QuestionView(View):
     @discord.ui.button(label=questions[4], style=discord.ButtonStyle.secondary)
     async def q4(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
-        await interaction.response.defer(thinking=True, ephemeral=False) 
-        
+        await interaction.response.defer(thinking=True, ephemeral=False)
         try:
-            channel = interaction.channel
-            await get_records(channel)
-        except Exception:
-            await interaction.followup.send("❌ 서버 연결 오류: 손상 기록을 조회할 수 없습니다.")
-    
-    
-    # @discord.ui.button(label=questions[5], style=discord.ButtonStyle.secondary)
-    # async def q5(self, interaction: discord.Interaction, button: Button):
-    #     await interaction.response.send_message(
-    #         content=f"🗓️ 보수 공사를 진행할 일자를 드롭다운 메뉴에서 선택해 주세요.",
-    #         view=ScheduleView(),
-    #         ephemeral=True 
-    #     )
+            await get_records(interaction.channel)
+        except Exception as e:
+            await interaction.followup.send(f"❌ 서버 연결 오류: {e}")
+
+    @discord.ui.button(label=questions[5], style=discord.ButtonStyle.secondary)
+    async def q5(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.send_modal(DateInputModal())
+
+        # 다른 방법) 드롭다운 형식
+        # await interaction.response.send_message(
+        #     content="🗓️ 보수 공사를 진행할 날짜를 선택하세요.",
+        #     view=ScheduleView(),
+        #     ephemeral=True
+        # )
 
 
 @client.event
