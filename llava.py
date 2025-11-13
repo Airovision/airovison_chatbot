@@ -1,7 +1,6 @@
 # python 코드로 LLaVA 실행하기
 import torch, textwrap, re # 라바 답변 줄바꿈
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
-import requests
 from PIL import Image
 from googletrans import Translator # 번역 라이브러리
 
@@ -45,17 +44,6 @@ def load_llava_model():
 def _as_str(m): # re.Match 객체 str로 변환
     return m.group(1).strip() if isinstance(m, re.Match) else (m.strip() if isinstance(m, str) else "")
 
-# llava 처음 알림 포맷
-
-# ver.3
-# prompt_start =  textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
-# Your analysis is NOT a substitute for a professional engineering inspection.
-# Analyze the image and provide the following information in a structured format:
-# 1. Defect Type: Identify the specific type of defect (Only classify the defect type into one of the following four categories: 
-# [Concrete Crack, Concrete Spalling, Paint Damage, Rebar Exposure] Do not use any other categories).
-# 2. Visual Description: Provide a concise yet informative summary of the defect’s visible characteristics and overall condition. Describe the shape, size, and color or texture differences compared to the surrounding area. Then, include a short analytical summary describing how severe or extensive the defect appears visually, as if giving a quick inspection report.
-# 3. Urgency for Inspection: Classify the urgency for a professional inspection as [Low, Medium, High]. (Only say "Low", "Medium" or "High")
-# """)
 
 def run_llava(image_path: str, question: str | None):
     """
@@ -68,6 +56,7 @@ def run_llava(image_path: str, question: str | None):
 
     # 2. 이미지와 프롬프트 입력받기
     # ./images/sample.jpg
+    image_path = "."+image_path
     image = Image.open(image_path)
 
     # 첫 시작 LLaVA 질문 ver.4
@@ -145,6 +134,7 @@ def run_llava(image_path: str, question: str | None):
         korean_result = translator.translate(english_result, src='en', dest='ko').text
         formatted_korean = re.sub(r'(?<=[가-힣\w][다요함임]\.)+', '\n', korean_result).strip()
         # '다.', '요.' 등으로 끝나고 공백이 이어질 때
+        return formatted_korean
     else:
         #각 항목 추출
         m_type = re.search(r"1\.\s*Defect Type:\s*(.+)", english_result)
@@ -153,23 +143,17 @@ def run_llava(image_path: str, question: str | None):
         defect_type = _as_str(m_type)
         urgency = _as_str(m_urg)
 
-        defect_type_kr = defect_type_choice[defect_type]
-        urgency_kr = urgency_choice[urgency]
-
-        formatted_korean = "🚨 손상 감지 🚨\n" \
-        "새로운 외벽 손상이 탐지되었습니다. 아래의 정보를 확인하세요.\n" \
-        "📍 위치     : 인천 미추홀구 인하로 100, 인하대학교용현캠퍼스 하이테크센터\n" \
-        "🕒 감지 시각: 2025-10-13 10:24 AM\n" \
-        f"🏷️ 손상 유형: {defect_type_kr}\n" \
-        f"⚠️ 위험도(점검 긴급성): {urgency_kr}"
+        defect_type_kr = defect_type_choice.get(defect_type, "분류 안됨")
+        urgency_kr = urgency_choice.get(urgency, "분류 안됨")
 
     
-    print("----LLaVA 질문 프롬프트----")
-    print(user_text)
-    print("----LLaVA 답변(eng.ver)----")
-    print(english_result)
+        return defect_type_kr, urgency_kr
 
-    print("----LLaVA 답변(kor.ver)----")
-    print(formatted_korean)
+    
+    # print("----LLaVA 질문 프롬프트----")
+    # print(user_text)
+    # print("----LLaVA 답변(eng.ver)----")
+    # print(english_result)
 
-    return formatted_korean
+    # print("----LLaVA 답변(kor.ver)----")
+    # print(formatted_korean)

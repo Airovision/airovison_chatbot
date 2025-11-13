@@ -1,25 +1,17 @@
-from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import Literal, Optional, List
-from datetime import datetime, timezone
-from pathlib import Path
-import json, os, uuid, io, sys
+from typing import Literal, Optional
 
 
-# ----- 설정 -----
-DATA_DIR = Path("data") # data라는 폴더가 DATA_DIR
-DATA_DIR.mkdir(exist_ok=True) # 폴더 없으면 생성
-JSONL_PATH = DATA_DIR / "defects.ndjson" # 폴더 안에 defects.ndjson 파일 생성
 
-DefectType = Literal["Concrete Crack","Concrete Spalling","Paint Damage","Rebar Exposure"]
-Urgency = Literal["High","Medium","Low"]
+DefectType = Literal["콘크리트 균열","콘크리트 박리","도장 손상","철근 노출"]
+Urgency = Literal["높음","보통","낮음"]
 
 
 # 생성용(드론 → 서버) : 최소 필수만
 class DefectCreate(BaseModel):
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
-    image: str
+    image: str = Field(..., description="이미지가 저장된 최종 URL") # image url
     # 선택: detect_time (없으면 서버가 채움)
     detect_time: Optional[str] = None
 
