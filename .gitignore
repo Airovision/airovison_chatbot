@@ -4,3 +4,4 @@ token.json
 airovenv/
 LLaVA/
 __pycache__
+data/
