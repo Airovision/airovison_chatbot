@@ -1,6 +1,4 @@
-import aiohttp
 import requests
-import os
 from config import settings
 from models import *
 
