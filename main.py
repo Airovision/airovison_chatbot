@@ -16,6 +16,7 @@ from database import init_db, create_defect_in_db, db_row_to_model
 from llava import load_llava_model, run_llava
 from airobot import *
 import asyncio
+from map import *
 
 from dotenv import load_dotenv # ⭐️ .env 로드
 
@@ -86,7 +87,10 @@ async def create_defect_info(defect: DefectCreate = Body(...)):
     else:
         # ISO 8601 형식 + UTC (Z)
         detect_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        
+
+    address = get_address_from_coords(defect.latitude, defect.longitude)
+    # address = get_address_from_coords(37.3595963, 127.1054328)  # 위도, 경도
+
     # 3. 최종 저장될 DefectOut 모델 객체 생성
     new_defect_data = DefectOut(
         id=new_id,
@@ -94,8 +98,9 @@ async def create_defect_info(defect: DefectCreate = Body(...)):
         longitude=defect.longitude,
         image=defect.image, # 클라이언트가 제공한 이미지 url
         detect_time=detect_time,
+        address=address
     )
-    
+    print(f"도로명: {address}\n")
 
     # 4. db에 해당 객체 데이터 연결(삽입)
     saved_defect = await create_defect_in_db(new_defect_data)
@@ -134,7 +139,7 @@ async def run_analysis_and_notify(defect: DefectOut):
         # 4. ⭐️ Discord 알림 전송 (discord_bot.py의 함수 호출)
         llava_summary = "🚨 손상 감지 🚨\n" \
             "새로운 외벽 손상이 탐지되었습니다. 아래의 정보를 확인하세요.\n" \
-            f"📍 위치 (좌표): {defect.latitude}, {defect.longitude}\n" \
+            f"📍 위치: {defect.address}\n" \
             f"🕒 감지 시각: {defect.detect_time}\n" \
             f"🏷️ 손상 유형: {defect_type}\n" \
             f"⚠️ 위험도(점검 긴급성): {urgency}"

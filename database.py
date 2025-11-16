@@ -43,14 +43,14 @@ def db_row_to_model(row: aiosqlite.Row) -> DefectOut:
 # ----- DB 안에 defect 객체 생성 -----
 async def create_defect_in_db(defect: DefectOut) -> Optional[DefectOut]:
     sql = """
-    INSERT INTO defects (id, latitude, longitude, image, detect_time)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO defects (id, latitude, longitude, image, detect_time, address)
+    VALUES (?, ?, ?, ?, ?, ?)
     """
     try:
         async with aiosqlite.connect(settings.DB_PATH) as db:
             await db.execute(sql, (
                 defect.id, defect.latitude, defect.longitude,
-                defect.image, defect.detect_time
+                defect.image, defect.detect_time, defect.address
             ))
             await db.commit()
         return defect
