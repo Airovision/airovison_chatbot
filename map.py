@@ -3,12 +3,6 @@ import requests
 import os
 from config import settings
 from models import *
-# from dotenv import load_dotenv # ⭐️ .env 로드
-
-# # ⭐️ .env 로드 (가장 먼저 실행)
-# load_dotenv()
-# NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
-# NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
 
 def get_address_from_coords(latitude, longitude):
     """
