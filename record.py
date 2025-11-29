@@ -63,7 +63,7 @@ async def get_records(channel: discord.TextChannel):
         return
         
     if not records:
-        await channel.send("ℹ️ DB에 저장된 결함 기록이 없습니다.")
+        await channel.send("ℹ️ DB에 저장된 손상 기록이 없습니다.")
         return
 
     await channel.send("📈 **보수 공사가 시급한 순으로 모든 손상 기록을 조회했어요\n**")
