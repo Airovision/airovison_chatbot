@@ -33,7 +33,6 @@ h2==3.2.0
 hf-xet==1.1.10
 hpack==3.0.0
 hstspreload==2025.1.1
-httpcore==0.9.1
 huggingface-hub==0.35.3
 hyperframe==5.2.0
 idna==2.10
