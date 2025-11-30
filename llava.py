@@ -2,7 +2,7 @@
 import torch, textwrap, re # 라바 답변 줄바꿈
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 from PIL import Image
-from googletrans import Translator # 번역 라이브러리
+from deep_translator import GoogleTranslator # 번역 라이브러리
 
 # LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
 _model = None
@@ -127,11 +127,10 @@ def run_llava(image_path: str, question: str | None):
     # 프롬프트를 제외한 순수 답변 부분만 추출
     english_result = english_result_full.split("ASSISTANT:")[-1].strip()
 
-    translator = Translator()
 
 
     if question:
-        korean_result = translator.translate(english_result, src='en', dest='ko').text
+        korean_result = GoogleTranslator(source='en', target='ko').translate(english_result)
         formatted_korean = re.sub(r'(?<=[가-힣\w][다요함임]\.)+', '\n', korean_result).strip()
         # '다.', '요.' 등으로 끝나고 공백이 이어질 때
         return formatted_korean
