@@ -2,7 +2,7 @@
 import torch, textwrap, re # 라바 답변 줄바꿈
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 from PIL import Image
-from deep_translator import GoogleTranslator # 번역 라이브러리
+from deep_translator import Translator # 번역 라이브러리
 
 # LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
 _model = None
@@ -14,7 +14,7 @@ def load_llava_model():
         return _model, _processor
 
     # 1. 모델과 프로세서 준비
-    model_id = "llava-hf/llava-1.5-7b-hf"
+    model_id = "llava-hf/llava-1.5-7b"
 
     # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
     # quantization_config = BitsAndBytesConfig(
@@ -22,8 +22,8 @@ def load_llava_model():
     #     bnb_4bit_compute_dtype=torch.float16
     # )
 
-    # 맥북 gpu용
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     # 모델 로드
     print("--- LLaVA 모델 불러오는 중... ---")
     _model = LlavaForConditionalGeneration.from_pretrained(
@@ -127,6 +127,7 @@ def run_llava(image_path: str, question: str | None):
     # 프롬프트를 제외한 순수 답변 부분만 추출
     english_result = english_result_full.split("ASSISTANT:")[-1].strip()
 
+    translator = Translator()
 
 
     if question:
