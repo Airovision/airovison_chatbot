@@ -26,8 +26,6 @@ fonttools==4.60.1
 frozenlist==1.8.0
 fsspec==2025.9.0
 googletrans==4.0.2
-gradio==4.7.1
-gradio_client==0.7.0
 h11==0.9.0
 h2==3.2.0
 hf-xet==1.1.10
@@ -43,7 +41,6 @@ jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
 kiwisolver==1.4.9
 latex2mathml==3.78.1
--e git+https://github.com/haotian-liu/LLaVA.git@c121f0432da27facab705978f83c4ada465e46fd#egg=llava
 markdown-it-py==4.0.0
 markdown2==2.5.4
 MarkupSafe==2.1.5
