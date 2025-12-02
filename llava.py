@@ -15,6 +15,7 @@ def load_llava_model():
 
     # 1. 모델과 프로세서 준비
     model_id = "llava-hf/llava-1.5-7b-hf"
+    revision = "a272c74"
 
     # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
     # quantization_config = BitsAndBytesConfig(
@@ -28,14 +29,14 @@ def load_llava_model():
     print("--- LLaVA 모델 불러오는 중... ---")
     _model = LlavaForConditionalGeneration.from_pretrained(
         model_id,
+        revision=revision,
         torch_dtype=torch.float16,
-        device_map="auto",
-        trust_remote_code=True
+        device_map="auto"
     )
 
     # Processor: fast → 실패 시 slow
     try:
-        _processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        _processor = AutoProcessor.from_pretrained(model_id, revision=revision)
     except Exception as e:
         print("Processor load failed:", e)
         raise
@@ -121,7 +122,6 @@ def run_llava(image_path: str, question: str | None):
     processor.vision_feature_select_strategy = model.config.vision_feature_select_strategy
     inputs = processor(images=image, text=prompt_for_model, return_tensors="pt")
     inputs = {k: v.to(_model.device) for k, v in inputs.items()}
-
 
     generate_ids = model.generate(**inputs, max_new_tokens=1000) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
