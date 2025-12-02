@@ -44,6 +44,7 @@ app = FastAPI(
     title="Airovision — 건물 외벽 손상 관리 API",
     description=(
         "**드론 촬영 이미지 및 메타데이터를 기반으로 건물 외벽 손상을 분석하는 AI 시스템**\n\n"
+        "---\n\n"
         "📡 드론 → 서버 → Discord 자동 알림 연동\n\n"
         "🔍 LLaVA 모델 기반 이미지 손상 분석\n\n"
         "🗂 SQLite 기반 손상 기록 저장 및 조회"
