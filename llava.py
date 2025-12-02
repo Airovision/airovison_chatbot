@@ -14,7 +14,7 @@ def load_llava_model():
         return _model, _processor
 
     # 1. 모델과 프로세서 준비
-    model_id = "llava-hf/llava-1.5-7b"
+    model_id = "llava-hf/llava-1.5-7b-hf"
 
     # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
     # quantization_config = BitsAndBytesConfig(
@@ -126,8 +126,6 @@ def run_llava(image_path: str, question: str | None):
     # 4. 결과 출력
     # 프롬프트를 제외한 순수 답변 부분만 추출
     english_result = english_result_full.split("ASSISTANT:")[-1].strip()
-
-    translator = Translator()
 
 
     if question:
