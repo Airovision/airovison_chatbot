@@ -44,10 +44,12 @@ app = FastAPI(
     title="Airovision — 건물 외벽 손상 관리 API",
     description=(
         "**드론 촬영 이미지 및 메타데이터를 기반으로 건물 외벽 손상을 분석하는 AI 시스템**\n\n"
+        "드론 → 라즈베리파이 + Hailo 엣지 장치 → FastAPI 서버 → LLaVA 분석 → Discord 알림\n\n"
         "---\n\n"
-        "📡 드론 → 서버 → Discord 자동 알림 연동\n\n"
-        "🔍 LLaVA 모델 기반 이미지 손상 분석\n\n"
-        "🗂 SQLite 기반 손상 기록 저장 및 조회"
+        "📡 드론 + 라즈베리파이 + Hailo 엣지 장치 기반 실시간 손상 탐지\n\n"
+        "🧠 FastAPI 서버에서 LLaVA 모델 기반 손상 이미지 분석\n\n"
+        "📋 SQLite 기반 손상 기록 저장 및 조회\n\n"
+        "🔔 Discord 챗봇 연동 손상 알림 및 상호작용"
     ),
     version="1.0.0",
     lifespan=lifespan # 앱 시작/종료 시 lifespan 함수 실행
