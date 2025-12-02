@@ -41,14 +41,12 @@ async def lifespan(app: FastAPI):
 
 # ----- FastAPI 앱 -----
 app = FastAPI(
-    title="Airovision — 건물 외벽 손상 관리 API (Drone/LLaVA)",
+    title="Airovision — 건물 외벽 손상 관리 API",
     description=(
-        "드론 촬영 이미지 및 메타데이터를 기반으로 건물 외벽 손상을 분석하는 AI 시스템\n\n"
-        "📡 **드론 → 서버 → Discord 자동 알림 연동**\n"
-        "🔍 **LLaVA 모델 기반 이미지 손상 분석**\n"
-        "🗂 **SQLite 기반 손상 기록 저장 및 조회**\n\n"
-        "---\n"
-        "👨‍💻 **개발팀: Airovision Team**"
+        "**드론 촬영 이미지 및 메타데이터를 기반으로 건물 외벽 손상을 분석하는 AI 시스템**\n\n"
+        "📡 드론 → 서버 → Discord 자동 알림 연동\n\n"
+        "🔍 LLaVA 모델 기반 이미지 손상 분석\n\n"
+        "🗂 SQLite 기반 손상 기록 저장 및 조회"
     ),
     version="1.0.0",
     lifespan=lifespan # 앱 시작/종료 시 lifespan 함수 실행
@@ -160,7 +158,7 @@ async def run_analysis_and_notify(defect: DefectOut):
 @app.post(
     "/upload-img",
     summary="[개발용] 로컬 이미지 업로드",
-    description="로컬 개발 시 파일 업로드를 위한 헬퍼 API\n배포 시 S3로 대체될 예정"
+    description="로컬 개발 시 파일 업로드를 위한 헬퍼 API입니다. 배포 시 S3로 대체될 예정입니다."
 )
 async def upload_image_dev(file: UploadFile = File(...)):
     """
