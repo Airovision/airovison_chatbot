@@ -2,7 +2,7 @@
 import torch, textwrap, re # 라바 답변 줄바꿈
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 from PIL import Image
-from deep_translator import Translator # 번역 라이브러리
+from deep_translator import GoogleTranslator # 번역 라이브러리
 
 # LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
 _model = None
