@@ -31,12 +31,12 @@ async def lifespan(app: FastAPI):
     await asyncio.to_thread(load_llava_model)
     
     # 3. ⭐️ Discord 봇 백그라운드 실행
-    #    client.run() (X) -> client.start() (O)
     asyncio.create_task(client.start(discord_key))
 
     yield
 
     print("애플리케이션을 종료합니다.")
+    await client.close()
 
 
 # ----- FastAPI 앱 -----
