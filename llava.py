@@ -31,7 +31,7 @@ def load_llava_model():
         torch_dtype=torch.float16,
         device_map="auto",
         trust_remote_code=True
-    ).to(device)
+    )
 
     # Processor: fast → 실패 시 slow
     try:
@@ -120,8 +120,8 @@ def run_llava(image_path: str, question: str | None):
     processor.patch_size = model.config.vision_config.patch_size
     processor.vision_feature_select_strategy = model.config.vision_feature_select_strategy
     inputs = processor(images=image, text=prompt_for_model, return_tensors="pt")
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    model.to(device)
+    inputs = {k: v.to(_model.device) for k, v in inputs.items()}
+
 
     generate_ids = model.generate(**inputs, max_new_tokens=1000) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
