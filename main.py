@@ -186,4 +186,4 @@ if __name__ == "__main__":
     print(f"DB 위치: {settings.DB_PATH.resolve()}")
     print(f"업로드 폴더: {settings.UPLOADS_DIR.resolve()}")
     print(f"정적 파일 URL: http://127.0.0.1:8000{settings.STATIC_MOUNT_PATH}/")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
