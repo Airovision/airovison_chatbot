@@ -29,14 +29,17 @@ def load_llava_model():
     _model = LlavaForConditionalGeneration.from_pretrained(
         model_id,
         torch_dtype=torch.float16,
+        device_map="auto",
+        trust_remote_code=True
     ).to(device)
 
     # Processor: fast → 실패 시 slow
     try:
-        _processor = AutoProcessor.from_pretrained(model_id, use_fast=True)
-    except Exception:
-        _processor = AutoProcessor.from_pretrained(model_id, use_fast=False)
-    
+        _processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+    except Exception as e:
+        print("Processor load failed:", e)
+        raise
+
     print("✅ LLaVA 모델 로드 완료")
     
     return _model, _processor
