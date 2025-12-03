@@ -175,28 +175,33 @@ def run_llava(image_path: str, question: str | None):
                                                 Evaluate the damage risk level on a scale of 1 to 10. Answer in the following format: \"It is XX points. {Write the reason in less than three sentences.}\"""")
     }
 
-    user_text = (prompt_start).strip()
-    messages = [{
-        "role": "user",
-        "content": [
-            {"type": "image"},
-            {"type": "text", "text": user_text},
-        ],
-    }]
+    user_text = llava_questions.get(question, question) if question else (prompt_start).strip()
+    # messages = [{
+    #     "role": "user",
+    #     "content": [
+    #         {"type": "image"},
+    #         {"type": "text", "text": user_text},
+    #     ],
+    # }]
 
-    # 모델용 템플릿 문자열 생성
-    prompt_for_model = processor.apply_chat_template(
-        messages, add_generation_prompt=True, tokenize=False
-    )
+    # # 모델용 템플릿 문자열 생성
+    # prompt_for_model = processor.apply_chat_template(
+    #     messages, add_generation_prompt=True, tokenize=False
+    # )
 
     # 3. 모델 추론 실행
     processor.patch_size = model.config.vision_config.patch_size
     processor.vision_feature_select_strategy = model.config.vision_feature_select_strategy
-    inputs = processor(images=image, text=prompt_for_model, return_tensors="pt")
-    inputs = {k: v.to(device) for k, v in inputs.items()}
-    model.to(device)
+    ##inputs = processor(images=image, text=prompt_for_model, return_tensors="pt")
+    ##inputs = {k: v.to(device) for k, v in inputs.items()}
+    ##model.to(device)
+    inputs = processor(
+        text=user_text,
+        images=image,
+        return_tensors="pt",
+    )
 
-    generate_ids = model.generate(**inputs, max_new_tokens=128) # max_new_tokens로 답변 길이 조절
+    generate_ids = model.generate(**inputs, max_new_tokens=1500) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     # 4. 결과 출력
