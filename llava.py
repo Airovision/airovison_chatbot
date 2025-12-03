@@ -38,10 +38,10 @@ def load_llava_model():
     revision = "a272c74"
 
     # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
-    # quantization_config = BitsAndBytesConfig(
-    #     load_in_4bit=True,
-    #     bnb_4bit_compute_dtype=torch.float16
-    # )
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16
+    )
     
     if torch.backends.mps.is_available(): # 맥북 gpu
         _device = "mps"
@@ -55,6 +55,7 @@ def load_llava_model():
     _model = LlavaForConditionalGeneration.from_pretrained(
         model_id,
         revision=revision,
+        quantization_config=quantization_config,
         torch_dtype=torch.float16,
         device_map="auto"
     )
