@@ -16,6 +16,7 @@ from database import init_db, create_defect_in_db, db_row_to_model
 from llava import load_llava_model, run_llava
 from airobot import *
 import asyncio
+from map import *
 
 from dotenv import load_dotenv # ⭐️ .env 로드
 
@@ -67,6 +68,14 @@ app.mount(
 )
 
 
+    # """
+    # (배포용/개발용 공통)
+    # 1. 드론에서 JSON (좌표 + 이미지 URL)을 받습니다.
+    # 2. DB에 '미완성' 상태로 즉시 저장하고 드론에게 응답합니다.
+    # 3. [백그라운드] LLaVA 분석을 실행합니다.
+    # 4. [백그라운드] LLaVA 결과를 DB에 PATCH(갱신)합니다.
+    # 5. [백그라운드] Discord로 알림을 보냅니다.
+    # """
 # ----- API 엔드포인트 -----
 @app.post(
     "/defect-info",
@@ -76,14 +85,6 @@ app.mount(
     description="드론에서 촬영한 이미지와 시간 정보를 받아 새 손상 데이터를 생성합니다."
 )
 async def create_defect_info(defect: DefectCreate = Body(...)):
-    """
-    (배포용/개발용 공통)
-    1. 드론에서 JSON (좌표 + 이미지 URL)을 받습니다.
-    2. DB에 '미완성' 상태로 즉시 저장하고 드론에게 응답합니다.
-    3. [백그라운드] LLaVA 분석을 실행합니다.
-    4. [백그라운드] LLaVA 결과를 DB에 PATCH(갱신)합니다.
-    5. [백그라운드] Discord로 알림을 보냅니다.
-    """
     
     # 1. 고유 ID 생성
     new_id = str(uuid.uuid4())
@@ -94,7 +95,9 @@ async def create_defect_info(defect: DefectCreate = Body(...)):
     else:
         # ISO 8601 형식 + UTC (Z)
         detect_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        
+
+    address = get_address_from_coords(defect.latitude, defect.longitude)
+
     # 3. 최종 저장될 DefectOut 모델 객체 생성
     new_defect_data = DefectOut(
         id=new_id,
@@ -102,19 +105,14 @@ async def create_defect_info(defect: DefectCreate = Body(...)):
         longitude=defect.longitude,
         image=defect.image, # 클라이언트가 제공한 이미지 url
         detect_time=detect_time,
+        address=address
     )
-    
 
     # 4. db에 해당 객체 데이터 연결(삽입)
     saved_defect = await create_defect_in_db(new_defect_data)
     if not saved_defect:
         raise HTTPException(status_code=500, detail="DB 저장 실패")
     
-    # 2. ⭐️ [핵심] LLaVA 분석 + DB 갱신 + Discord 알림을
-    #    '백그라운드 작업'으로 분리 (드론이 기다리지 않게 함)
-    # asyncio.create_task(
-    #     run_analysis_and_notify(saved_defect)
-    # )
     final_defect = await run_analysis_and_notify(saved_defect)
     if final_defect is None:
         raise HTTPException(status_code=500, detail="데이터베이스 저장에 실패했습니다.")
@@ -142,7 +140,7 @@ async def run_analysis_and_notify(defect: DefectOut):
         # 4. ⭐️ Discord 알림 전송 (discord_bot.py의 함수 호출)
         llava_summary = "🚨 손상 감지 🚨\n" \
             "새로운 외벽 손상이 탐지되었습니다. 아래의 정보를 확인하세요.\n" \
-            f"📍 위치 (좌표): {defect.latitude}, {defect.longitude}\n" \
+            f"📍 위치: {defect.address}\n" \
             f"🕒 감지 시각: {defect.detect_time}\n" \
             f"🏷️ 손상 유형: {defect_type}\n" \
             f"⚠️ 위험도(점검 긴급성): {urgency}"
@@ -154,7 +152,7 @@ async def run_analysis_and_notify(defect: DefectOut):
         print(f"❌ 백그라운드 작업 실패 (ID: {defect.id}): {e} : {type(e)}")
         # ⭐️ [중요] 'import'와 'traceback' 두 줄을 추가합니다.
         import traceback
-        traceback.print_exc() # ⭐️ 전체 오류 로그 출력
+        traceback.print_exc() # 전체 오류 로그 출력
         # (오류 발생 시 Discord로 오류 알림을 보낼 수도 있음)
 
 

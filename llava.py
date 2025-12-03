@@ -2,16 +2,36 @@
 import torch, textwrap, re # 라바 답변 줄바꿈
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 from PIL import Image
+import os
 from deep_translator import GoogleTranslator # 번역 라이브러리
+
 
 # LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
 _model = None
 _processor = None
+_device = None
+
+REF_DIR = "./reference_images" # ICL 기법 프롬프트에 들어갈 예시 사진들
+
+# 손상 유형
+defect_type_choice = {
+    "Concrete Crack" : "콘크리트 균열",
+    "Concrete Spalling" : "콘크리트 박리",
+    "Paing Damage" : "도장 손상",
+    "Rebar Exposure" : "철근 노출"
+}
+
+# 위험도
+urgency_choice = {
+    "High" : "높음",
+    "Medium" : "보통",
+    "Low" : "낮음"
+}
 
 def load_llava_model():
-    global _model, _processor
+    global _model, _processor, _device
     if _model is not None and _processor is not None:
-        return _model, _processor
+        return _model, _processor, _device
 
     # 1. 모델과 프로세서 준비
     model_id = "llava-hf/llava-1.5-7b-hf"
@@ -22,9 +42,14 @@ def load_llava_model():
     #     load_in_4bit=True,
     #     bnb_4bit_compute_dtype=torch.float16
     # )
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
+    
+    if torch.backends.mps.is_available(): # 맥북 gpu
+        _device = "mps"
+    elif torch.cuda.is_available(): # 서버 gpu
+        _device = "cuda"
+    else:
+        _device = "cpu"
+    
     # 모델 로드
     print("--- LLaVA 모델 불러오는 중... ---")
     _model = LlavaForConditionalGeneration.from_pretrained(
@@ -38,12 +63,11 @@ def load_llava_model():
     try:
         _processor = AutoProcessor.from_pretrained(model_id, revision=revision)
     except Exception as e:
-        print("Processor load failed:", e)
-        raise
-
+       print("Processor load failed:", e)
+       raise
     print("✅ LLaVA 모델 로드 완료")
     
-    return _model, _processor
+    return _model, _processor, _device
 
 def _as_str(m): # re.Match 객체 str로 변환
     return m.group(1).strip() if isinstance(m, re.Match) else (m.strip() if isinstance(m, str) else "")
@@ -56,53 +80,102 @@ def run_llava(image_path: str, question: str | None):
     question: 버튼으로 받은 한국어 질문
     """
 
-    model, processor = load_llava_model()
+    model, processor, device = load_llava_model()
 
     # 2. 이미지와 프롬프트 입력받기
     # ./images/sample.jpg
-    image_path = "."+image_path
+    image_path = image_path if question else "."+image_path
     image = Image.open(image_path)
 
-    # 첫 시작 LLaVA 질문 ver.4
-    prompt_start =  textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
+    # llava 질문(+배경지식 제공)
+    prompt_start = textwrap.dedent(
+    """
+    You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
     Your analysis is NOT a substitute for a professional engineering inspection.
-    Analyze the image and provide the following information in a structured format:
-    1. Defect Type: Identify the specific type of defect (Only classify the defect type into one of the following four categories: 
-    [Concrete Crack, Concrete Spalling, Paint Damage, Rebar Exposure] Do not use any other categories).
-    2. Urgency for Inspection: Classify the urgency for a professional inspection as [Low, Medium, High]. (Only say "Low", "Medium" or "High")
-    """)
+    Analyze the image carefully and provide the following information in a structured format.
+    ===========================
+    ETAILED DEFECT GUIDELINES
+    ==========================
 
-    # 손상 유형
-    defect_type_choice = {
-        "Concrete Crack" : "콘크리트 균열",
-        "Concrete Spalling" : "콘크리트 박리",
-        "Paing Damage" : "도장 손상",
-        "Rebar Exposure" : "철근 노출"
-    }
+    Classify the defect into exactly ONE of the following categories:
+    [Concrete Crack, Concrete Spalling, Paint Damage, Rebar Exposure, None]
+    Use the following definitions and visual criteria strictly:
 
-    # 위험도
-    urgency_choice = {
-        "High" : "높음",
-        "Medium" : "보통",
-        "Low" : "낮음"
-    }
+    1. Concrete Crack:
+    - Appears as one or multiple linear cracks (thin or thick lines).
+    - Cracks may run vertically, horizontally, or diagonally.
+    - Severity increases when cracks are thicker, longer, or branching.
+    - Minor cracks usually appear as slightly darker lines compared to the surrounding concrete, with low color contrast.
+    - Severe or deep cracks appear significantly darker, often nearly black, because the interior receives little to no light.
+    - IMPORTANT: Even if the crack is thin, if it appears consistently dark or black along a long segment, treat it as a deeper or more severe crack. In such cases, assign Medium or High urgency rather than Low.
+    - IMPORTANT: if the crack looks like hair line, it is low
+    - IMPORTANT: Only the surface is split; no thick concrete chunk is missing.
 
-    # LLaVA 추가 질문 목록
+    2. Rebar Exposure:
+    - Reinforcing steel bars are visible due to severe concrete loss.
+    - Rebar may appear rusty, orange-brown, or metallic.
+    - The surrounding concrete is deeply missing.
+    - IMPORTANT: If any rebar is visible, classify as Rebar Exposure (not Crack or Spalling).
+
+    3. Concrete Spalling:
+    - Thick concrete pieces have detached, creating a deep, rough, irregular cavity.
+    - Much deeper and thicker than paint peeling.
+    - Severity increases with depth, width, and size of the missing concrete.
+    - IMPORTANT: If rebar is visible, classify as Rebar Exposure instead.
+
+    4. Paint Damage:
+    - Only the outer paint layer is peeling or flaking.
+     The underlying concrete remains intact.
+    - The removed layer is thin, shallow, and mostly cosmetic.
+    - Usually classified as Low risk.
+
+    5. None:
+    - If the image does not match ANY of the above defect characteristics, classify as “None”.
+    - Examples of NON-defects: window frames, door frames, panel seams, tile joints, shadows, reflections, dirt, stains.
+    - Straight lines from structural elements must NOT be considered cracks.
+    - If the category is "None", urgency also returns "None"
+
+    ===========================
+    URGENCY LEVEL DEFINITIONS
+    ===========================
+    High:
+    - The damage poses a serious structural or safety risk.
+    - Immediate inspection or repair is strongly recommended.
+    - Examples: exposed rebar, deep spalling, wide or growing cracks.
+
+    Medium:
+    - Not immediately dangerous but may worsen if untreated.
+    - Monitoring or near-term inspection is recommended.
+    - Examples: medium-sized cracks, early-stage spalling, repeated cracking.
+
+    Low:
+    - Does not currently threaten structural stability or safety.
+    - Regular maintenance or simple observation is sufficient.
+    - Examples: paint peeling, minor discoloration.
+
+    ===========================
+    INSTRUCTIONS FOR OUTPUT
+    ===========================
+    Return your answer ONLY in the following format:
+
+    1. Defect Type: <one of the five categories>
+    2. Urgency for Inspection: <Low, Medium, or High>
+
+    Do not include any additional explanation.""")
+
+
     llava_questions = {
         "이미지에 나타난 손상에 대해 분석 요약해주세요": textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
                                                 Your analysis is NOT a substitute for a professional engineering inspection.
                                                 Provide a concise yet informative summary of the defect’s visible characteristics and overall condition.
                                                 Describe the shape, size, and color or texture differences compared to the surrounding area.
                                                 Then, include a short analytical summary describing how severe or extensive the defect appears visually, as if giving a quick inspection report."""),
-        "건물의 손상 정도를 측정해주세요": textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
-                                                Your analysis is NOT a substitute for a professional engineering inspection.
-                                                Can you measure how much dameged the buiilding in?"""),
         "이 손상의 위험도를 1~10 단계로 평가해주세요": textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
                                                 Your analysis is NOT a substitute for a professional engineering inspection.
                                                 Evaluate the damage risk level on a scale of 1 to 10. Answer in the following format: \"It is XX points. {Write the reason in less than three sentences.}\"""")
     }
 
-    user_text =  llava_questions.get(question, question) if question else (prompt_start).strip()
+    user_text = (prompt_start).strip()
     messages = [{
         "role": "user",
         "content": [
@@ -117,18 +190,19 @@ def run_llava(image_path: str, question: str | None):
     )
 
     # 3. 모델 추론 실행
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
     processor.patch_size = model.config.vision_config.patch_size
     processor.vision_feature_select_strategy = model.config.vision_feature_select_strategy
     inputs = processor(images=image, text=prompt_for_model, return_tensors="pt")
-    inputs = {k: v.to(_model.device) for k, v in inputs.items()}
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    model.to(device)
 
-    generate_ids = model.generate(**inputs, max_new_tokens=1000) # max_new_tokens로 답변 길이 조절
+    generate_ids = model.generate(**inputs, max_new_tokens=128) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     # 4. 결과 출력
     # 프롬프트를 제외한 순수 답변 부분만 추출
     english_result = english_result_full.split("ASSISTANT:")[-1].strip()
+
 
 
     if question:
@@ -138,23 +212,22 @@ def run_llava(image_path: str, question: str | None):
         return formatted_korean
     else:
         #각 항목 추출
-        m_type = re.search(r"1\.\s*Defect Type:\s*(.+)", english_result)
-        m_urg = re.search(r"2\.\s*Urgency for Inspection:\s*(.+)", english_result)
+        m_type = re.search(r"Defect Type:\s*(.+)", english_result)
+        m_urg = re.search(r"Urgency for Inspection:\s*(.+)", english_result)
 
         defect_type = _as_str(m_type)
         urgency = _as_str(m_urg)
 
         defect_type_kr = defect_type_choice.get(defect_type, "분류 안됨")
+
         urgency_kr = urgency_choice.get(urgency, "분류 안됨")
 
-    
+        print("----LLaVA 질문 프롬프트----")
+        print(user_text)
+        print("----LLaVA 답변----")
+        print(english_result)
+        print("---- LLaVA 답변(eng) ----")
+        print(f"Defect type: {defect_type}, Urgency: {urgency}")
+        print("---- LLaVA 답변(kor) ----")
+        print(f"손상 유형: {defect_type_kr}, 위험도: {urgency_kr}")
         return defect_type_kr, urgency_kr
-
-    
-    # print("----LLaVA 질문 프롬프트----")
-    # print(user_text)
-    # print("----LLaVA 답변(eng.ver)----")
-    # print(english_result)
-
-    # print("----LLaVA 답변(kor.ver)----")
-    # print(formatted_korean)

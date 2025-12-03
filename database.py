@@ -43,14 +43,14 @@ def db_row_to_model(row: aiosqlite.Row) -> DefectOut:
 # ----- DB 안에 defect 객체 생성 -----
 async def create_defect_in_db(defect: DefectOut) -> Optional[DefectOut]:
     sql = """
-    INSERT INTO defects (id, latitude, longitude, image, detect_time)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO defects (id, latitude, longitude, image, detect_time, address)
+    VALUES (?, ?, ?, ?, ?, ?)
     """
     try:
         async with aiosqlite.connect(settings.DB_PATH) as db:
             await db.execute(sql, (
                 defect.id, defect.latitude, defect.longitude,
-                defect.image, defect.detect_time
+                defect.image, defect.detect_time, defect.address
             ))
             await db.commit()
         return defect
@@ -75,12 +75,12 @@ async def patch_defect_in_db(defect_id: str, patch_data) -> Optional[DefectOut]:
                 print(f"Defect ID '{defect_id}'를 찾을 수 없습니다.")
                 return None
             
-            # 2. ⭐️ Pydantic 모델로 데이터 병합 (이전 코드와 동일)
+            # 2. Pydantic 모델로 데이터 병합 (이전 코드와 동일)
             current_defect = db_row_to_model(current_row)
             patch_dict = patch_data.model_dump(exclude_unset=True) # 전송된 값만 추출
             updated_defect = current_defect.model_copy(update=patch_dict) # 안전하게 덮어쓰기
 
-            # 3. ⭐️ 변경된 내용으로 DB UPDATE
+            # 3. 변경된 내용으로 DB UPDATE
             sql = """
             UPDATE defects
             SET defect_type = ?, urgency = ?, address = ?

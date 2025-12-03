@@ -14,12 +14,12 @@ class DefectCreate(BaseModel):
     image: str = Field(..., description="이미지가 저장된 최종 URL") # image url
     # 선택: detect_time (없으면 서버가 채움)
     detect_time: Optional[str] = None
+    address: Optional[str] = None
 
 # 부분 갱신용(LLaVA → 서버) : 모두 optional
 class DefectPatch(BaseModel):
     defect_type: Optional[DefectType] = None
     urgency: Optional[Urgency] = None
-    address: Optional[str] = None
 
 
 # 조회/응답용(최종 병합 상태)

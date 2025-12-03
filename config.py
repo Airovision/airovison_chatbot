@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     # DB 설정
     DATA_DIR: Path = Path("data")
     DB_NAME: str = "defects.db"
-    
+
+    NAVER_CLIENT_ID: str
+    NAVER_CLIENT_SECRET: str
     # 로컬 스토리지 설정 (개발용)
     UPLOADS_DIR_NAME: str = "images"
     STATIC_MOUNT_PATH: str = "/data"
