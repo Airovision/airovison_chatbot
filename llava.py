@@ -189,6 +189,12 @@ def run_llava(image_path: str, question: str | None):
     #     messages, add_generation_prompt=True, tokenize=False
     # )
 
+    prompt_for_model = (
+        "USER: <image>\n"
+        f"{user_text}\n"
+        "ASSISTANT:"
+    )
+
     # 3. 모델 추론 실행
     processor.patch_size = model.config.vision_config.patch_size
     processor.vision_feature_select_strategy = model.config.vision_feature_select_strategy
@@ -196,7 +202,7 @@ def run_llava(image_path: str, question: str | None):
     ##inputs = {k: v.to(device) for k, v in inputs.items()}
     ##model.to(device)
     inputs = processor(
-        text=user_text,
+        text=prompt_for_model,
         images=image,
         return_tensors="pt",
     )
