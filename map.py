@@ -82,56 +82,6 @@ def get_address_from_coords(latitude, longitude):
         print(f"Request Error: {e}")
         return None
 
-
-# ----- 네이버 지도 Reverse Geocoding -----
-# async def get_address_from_coords(lat: float, lon: float) -> Optional[str]:
-#     """
-#     네이버 Reverse Geocoding API를 사용해 좌표 -> 도로명주소 변환
-#     """
-#     url = "https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc"
-#     headers = {
-#         "X-NCP-APIGW-API-KEY-ID": settings.NAVER_CLIENT_ID,
-#         "X-NCP-APIGW-API-KEY": settings.NAVER_CLIENT_SECRET,
-#     }
-#     params = {
-#         "coords": f"{lon},{lat}",  # (경도, 위도)
-#         "orders": "roadaddr,addr",
-#         "output": "json",
-#     }
-
-#     try:
-#         async with aiohttp.ClientSession() as session:
-#             async with session.get(url, headers=headers, params=params) as resp:
-#                 if resp.status != 200:
-#                     print(f"[ReverseGeocode] API 요청 실패: {resp.status}")
-#                     return None
-
-#                 data = await resp.json()
-#                 results = data.get("results")
-#                 if not results:
-#                     return None
-
-#                 # 도로명주소 우선, 없으면 지번주소
-#                 for result in results:
-#                     region = result.get("region", {})
-#                     land = result.get("land", {})
-#                     area1 = region.get("area1", {}).get("name", "")
-#                     area2 = region.get("area2", {}).get("name", "")
-#                     area3 = region.get("area3", {}).get("name", "")
-#                     area4 = region.get("area4", {}).get("name", "")
-#                     name = land.get("name", "")
-#                     number1 = land.get("number1", "")
-#                     number2 = land.get("number2", "")
-
-#                     address = f"{area1} {area2} {area3} {area4} {name} {number1}"
-#                     if number2:
-#                         address += f"-{number2}"
-#                     return address.strip()
-
-#                 return None
-#     except Exception as e:
-#         print(f"[ReverseGeocode] 예외 발생: {e}")
-#         return None
     
 
     

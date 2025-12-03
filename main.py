@@ -13,7 +13,7 @@ import shutil
 from config import settings
 from models import DefectCreate, DefectOut, DefectPatch
 from database import init_db, create_defect_in_db, db_row_to_model
-from llava import load_llava_model, analyze_defect_basic
+from llava import load_llava_model, run_llava
 from airobot import *
 import asyncio
 from map import *
@@ -32,18 +32,26 @@ async def lifespan(app: FastAPI):
     await asyncio.to_thread(load_llava_model)
     
     # 3. ⭐️ Discord 봇 백그라운드 실행
-    #    client.run() (X) -> client.start() (O)
     asyncio.create_task(client.start(discord_key))
 
     yield
 
     print("애플리케이션을 종료합니다.")
+    await client.close()
 
 
 # ----- FastAPI 앱 -----
 app = FastAPI(
-    title="결함 관리 API (Drone/LLaVA)",
-    description="드론에서 결함 정보를 받고 LLaVA가 분석한 데이터를 갱신합니다.",
+    title="Airovision — 건물 외벽 손상 관리 API",
+    description=(
+        "**드론 촬영 이미지 및 메타데이터를 기반으로 건물 외벽 손상을 분석하는 AI 시스템**\n\n"
+        "드론 → 라즈베리파이 + Hailo 엣지 장치 → FastAPI 서버 → LLaVA 분석 → Discord 알림\n\n"
+        "---\n\n"
+        "📡 드론 + 라즈베리파이 + Hailo 엣지 장치 기반 실시간 손상 탐지\n\n"
+        "🧠 FastAPI 서버에서 LLaVA 모델 기반 손상 이미지 분석\n\n"
+        "📋 SQLite 기반 손상 기록 저장 및 조회\n\n"
+        "🔔 Discord 챗봇 연동 손상 알림 및 상호작용"
+    ),
     version="1.0.0",
     lifespan=lifespan # 앱 시작/종료 시 lifespan 함수 실행
 )
@@ -73,8 +81,8 @@ app.mount(
     "/defect-info",
     response_model=DefectOut,
     status_code=201, # 201 Created
-    summary="새로운 결함 정보 생성 (드론용)",
-    description="드론에서 촬영한 이미지와 위치 정보를 받아 새 결함 데이터를 생성합니다."
+    summary="[드론용] 새로운 손상 정보 생성",
+    description="드론에서 촬영한 이미지와 시간 정보를 받아 새 손상 데이터를 생성합니다."
 )
 async def create_defect_info(defect: DefectCreate = Body(...)):
     
@@ -116,7 +124,7 @@ async def run_analysis_and_notify(defect: DefectOut):
     POST 요청과는 별개로 실행되는 백그라운드 작업
     """
     try:
-        defect_type,  urgency = await asyncio.to_thread(analyze_defect_basic, defect.image)
+        defect_type,  urgency = await asyncio.to_thread(run_llava, defect.image, None)
         
         
         # 3. DB 갱신 (PATCH)
@@ -149,9 +157,9 @@ async def run_analysis_and_notify(defect: DefectOut):
 
 
 @app.post(
-    "/upload-image-dev",
+    "/upload-img",
     summary="[개발용] 로컬 이미지 업로드",
-    description="로컬 개발 시 파일 업로드를 위한 헬퍼 API. 배포 시 S3로 대체될 예정."
+    description="로컬 개발 시 파일 업로드를 위한 헬퍼 API입니다. 배포 시 S3로 대체될 예정입니다."
 )
 async def upload_image_dev(file: UploadFile = File(...)):
     """
@@ -184,4 +192,4 @@ if __name__ == "__main__":
     print(f"DB 위치: {settings.DB_PATH.resolve()}")
     print(f"업로드 폴더: {settings.UPLOADS_DIR.resolve()}")
     print(f"정적 파일 URL: http://127.0.0.1:8000{settings.STATIC_MOUNT_PATH}/")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
