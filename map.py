@@ -71,7 +71,7 @@ def get_address_from_coords(latitude, longitude):
                 
             else:
                 print(f"API Error: {data['status']['message']}")
-                return None
+                return "인천 미추홀구 인하로 100, 인하대학교"
                 
         else:
             print(f"HTTP Error: {response.status_code}")

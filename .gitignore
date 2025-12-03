@@ -5,3 +5,5 @@ airovenv/
 LLaVA/
 __pycache__/
 data/
+llava_test.py
+test_image/
