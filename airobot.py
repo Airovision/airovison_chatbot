@@ -36,10 +36,12 @@ questions = {
 
 # 버튼 UI 정의
 class QuestionView(View):
-    def __init__(self, image_url: str, defect_id: str):
+    def __init__(self, image_url: str, defect_id: str, defect_type: str, urgency: str):
         super().__init__(timeout=None)
         self.image_url = image_url
         self.defect_id = defect_id
+        self.defect_type = defect_type
+        self.urgency = urgency
         # (참고) self.defect_id를 사용해 LLaVA 분석 결과를 DB에 PATCH할 수 있음
 
 
@@ -50,10 +52,9 @@ class QuestionView(View):
 
         await interaction.response.defer(thinking=True, ephemeral=True) # 3초가 지나도 상호작용하게끔 thinking=True
         print(f"img url: {self.image_url}")
-        result = run_llava(self.image_url, questions[1])
-        # result = await asyncio.to_thread(
-        #     run_llava, self.image_url, questions[1]
-        # )
+        result = await asyncio.to_thread(
+            run_llava, self.image_url, questions[1], self.defect_id, self.defect_type, self.urgency
+        )
         
         await interaction.followup.send(result)
 
@@ -65,7 +66,7 @@ class QuestionView(View):
 
         await interaction.response.defer(thinking=True, ephemeral=True)
         result = await asyncio.to_thread(
-            run_llava, self.image_url, questions[2]
+            run_llava, self.image_url, questions[2], self.defect_id, self.defect_type, self.urgency
         )
         
         await interaction.followup.send(result)
@@ -98,8 +99,8 @@ async def send_defect_alert(defect: DefectOut, llava_summary: str):
         image_path = "." + defect.image
         discord_file = discord.File(image_path, filename=os.path.basename(image_path))
 
-        # 2. ⭐️ [수정] 동적 View 생성
-        view = QuestionView(image_url=image_path, defect_id=defect.id)
+        # 2. 동적 View 생성
+        view = QuestionView(image_url=image_path, defect_id=defect.id, defect_type=defect.defect_type, urgency=defect.urgency)
         
 
         await channel.send(content=llava_summary, file=discord_file, view=view)
