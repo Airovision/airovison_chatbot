@@ -3,7 +3,7 @@ credentials.json
 token.json
 airovenv/
 LLaVA/
-__pycache__/
+__pycache__/*
 data/
 llava_test.py
 test_image/
