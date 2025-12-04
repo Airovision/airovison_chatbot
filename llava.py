@@ -2,9 +2,9 @@
 import torch, textwrap, re # 라바 답변 줄바꿈
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 from PIL import Image
-import os
 from deep_translator import GoogleTranslator # 번역 라이브러리
-
+from io import BytesIO
+import requests
 
 # LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
 _model = None
@@ -78,6 +78,16 @@ def load_llava_model():
 def _as_str(m): # re.Match 객체 str로 변환
     return m.group(1).strip() if isinstance(m, re.Match) else (m.strip() if isinstance(m, str) else "")
 
+def load_image(image_path: str, question: str|None)-> Image.Image:
+    # 1) S3 URL (http/https URL)인 경우
+    if image_path.startswith("http://") or image_path.startswith("https://"):
+        resp = requests.get(image_path, timeout=10)
+        resp.raise_for_status()
+        return Image.open(BytesIO(resp.content)).convert("RGB")
+
+    # 2) 로컬 경로인 경우 (기존 로직 유지)
+    local_path = image_path if question else "." + image_path
+    return Image.open(local_path).convert("RGB")
 
 def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_type: str|None, urgency:str|None):
     """
@@ -88,10 +98,8 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
 
     model, processor, device = load_llava_model()
 
-    # 2. 이미지와 프롬프트 입력받기
-    # ./images/sample.jpg
-    image_path = image_path if question else "."+image_path
-    image = Image.open(image_path)
+    # 2. 이미지와 프롬프트 입력받기 (로컬용/S3용 모두 호환됨)
+    image = load_image(image_path, question)
 
     # llava 질문(+배경지식 제공)
     prompt_start = textwrap.dedent(
