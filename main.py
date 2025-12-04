@@ -157,34 +157,34 @@ async def run_analysis_and_notify(defect: DefectOut):
         # (오류 발생 시 Discord로 오류 알림을 보낼 수도 있음)
 
 
-# @app.post(
-#     "/upload-img",
-#     summary="[개발용] 로컬 이미지 업로드",
-#     description="로컬 개발 시 파일 업로드를 위한 헬퍼 API입니다. 배포 시 S3로 대체될 예정입니다."
-# )
-# async def upload_image_dev(file: UploadFile = File(...)):
-#     """
-#     (개발용)
-#     이미지 파일을 받아 서버 로컬(/data/images)에 저장하고
-#     접근 가능한 URL을 반환합니다.
-#     """
-#     try:
-#         file_extension = Path(file.filename).suffix
-#         file_name = f"{uuid.uuid4()}{file_extension}"
-#         file_path = settings.UPLOADS_DIR / file_name
+@app.post(
+    "/upload-img-dev",
+    summary="[개발용] 로컬 이미지 업로드",
+    description="로컬 개발 시 파일 업로드를 위한 헬퍼 API입니다. 배포 시 S3로 대체될 예정입니다."
+)
+async def upload_image_dev(file: UploadFile = File(...)):
+    """
+    (개발용)
+    이미지 파일을 받아 서버 로컬(/data/images)에 저장하고
+    접근 가능한 URL을 반환합니다.
+    """
+    try:
+        file_extension = Path(file.filename).suffix
+        file_name = f"{uuid.uuid4()}{file_extension}"
+        file_path = settings.UPLOADS_DIR / file_name
 
-#         with open(file_path, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
             
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
-#     finally:
-#         file.file.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
+    finally:
+        file.file.close()
 
-#     # /data/images/파일명.jpg 형식의 URL 반환
-#     image_url_path = f"{settings.STATIC_MOUNT_PATH}/{settings.UPLOADS_DIR_NAME}/{file_name}"
+    # /data/images/파일명.jpg 형식의 URL 반환
+    image_url_path = f"{settings.STATIC_MOUNT_PATH}/{settings.UPLOADS_DIR_NAME}/{file_name}"
     
-#     return {"url": image_url_path}
+    return {"url": image_url_path}
 
 @app.post(
     "/upload-img",

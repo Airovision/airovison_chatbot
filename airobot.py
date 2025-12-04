@@ -1,5 +1,6 @@
 import io
 import os
+from urllib.parse import urlparse
 import discord
 from discord import app_commands
 from discord.ui import View, Button
@@ -11,7 +12,7 @@ from llava import run_llava
 from record import *
 from models import *
 from database import *
-
+from io import BytesIO
 load_dotenv() # .env 파일의 환경변수 가져오기
 
 
@@ -96,11 +97,32 @@ async def send_defect_alert(defect: DefectOut, llava_summary: str):
             print(f"❌ 알림 실패: 채널(ID: {CHANNEL_ID})을 찾을 수 없음")
             return
 
-        image_path = "." + defect.image
-        discord_file = discord.File(image_path, filename=os.path.basename(image_path))
+        image_url = defect.image  # DB에 저장된 값 (S3 URL 또는 로컬 경로)
+
+        # 1) S3 URL(http/https URL)인 경우 → requests로 받아서 Discord 파일로
+        if image_url.startswith("http://") or image_url.startswith("https://"):
+            try:
+                resp = requests.get(image_url, timeout=10)
+                resp.raise_for_status()
+            except requests.RequestException as e:
+                print(f"❌ S3 이미지 다운로드 실패: {image_url} / {e}")
+                return
+
+            buf = BytesIO(resp.content)
+            parsed = urlparse(image_url)
+            filename = os.path.basename(parsed.path) or f"defect_{defect.id}.jpg"
+            discord_file = discord.File(buf, filename=filename)
+
+            view_image_url = image_url
+
+        else:
+            # 2) 로컬 경로인 경우
+            image_path = "." + image_url
+            discord_file = discord.File(image_path, filename=os.path.basename(image_path))
+            view_image_url = image_path  # View에서 쓸 이미지 경로
 
         # 2. 동적 View 생성
-        view = QuestionView(image_url=image_path, defect_id=defect.id, defect_type=defect.defect_type, urgency=defect.urgency)
+        view = QuestionView(image_url=view_image_url, defect_id=defect.id, defect_type=defect.defect_type, urgency=defect.urgency)
         
 
         await channel.send(content=llava_summary, file=discord_file, view=view)
