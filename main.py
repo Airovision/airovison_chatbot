@@ -18,9 +18,9 @@ from airobot import *
 import asyncio
 from map import *
 
-from dotenv import load_dotenv # ⭐️ .env 로드
+from dotenv import load_dotenv # .env 로드
 
-# ⭐️ .env 로드 (가장 먼저 실행)
+# .env 로드 (가장 먼저 실행)
 load_dotenv()
 
 @asynccontextmanager

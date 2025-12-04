@@ -37,11 +37,6 @@ def load_llava_model():
     model_id = "llava-hf/llava-1.5-7b-hf"
     revision = "a272c74"
 
-    # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
-    quantization_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16
-    )
     
     if torch.backends.mps.is_available(): # 맥북 gpu
         _device = "mps"
@@ -49,6 +44,16 @@ def load_llava_model():
         _device = "cuda"
     else:
         _device = "cpu"
+
+    
+    # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
+    if _device == "cuda":
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16
+        )
+    else:
+        quantization_config = None
     
     # 모델 로드
     print("--- LLaVA 모델 불러오는 중... ---")
@@ -167,48 +172,54 @@ def run_llava(image_path: str, question: str | None):
 
     llava_questions = {
         "이미지에 나타난 손상에 대해 분석 요약해주세요": textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
-                                                Your analysis is NOT a substitute for a professional engineering inspection.
-                                                Provide a concise yet informative summary of the defect’s visible characteristics and overall condition.
-                                                Describe the shape, size, and color or texture differences compared to the surrounding area.
-                                                Then, include a short analytical summary describing how severe or extensive the defect appears visually, as if giving a quick inspection report."""),
-        "이 손상의 위험도를 1~10 단계로 평가해주세요": textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
-                                                Your analysis is NOT a substitute for a professional engineering inspection.
-                                                Evaluate the damage risk level on a scale of 1 to 10. Answer in the following format: \"It is XX points. {Write the reason in less than three sentences.}\"""")
+                                                                Your analysis is NOT a substitute for a professional engineering inspection.
+
+                                                                Provide a concise but informative description in 3-4 sentences, in a natural conversational tone.
+                                                                Follow this pattern as closely as possible:
+
+                                                                "The damage in the image appears as [brief visual description of the damage: shape, size, location, and visible texture/color differences]. Based on this appearance, it could cause [potential issues or risks], and the urgency of repair appears to be [how urgent the repair seems, e.g., not very urgent / advisable in the near future / quite urgent]."
+
+                                                                Replace the bracketed parts with your assessment based on the image.
+                                                                Do not add any extra sentences, lists, or sections outside this pattern.
+                                                            """),
+        "어떤 조치가 필요할지 조언이 필요해요": textwrap.dedent("""Based only on the visible appearance of the damage in the image, what kind of follow-up actions would you tentatively recommend?
+                                                        For example, you may mention things like closer professional inspection, monitoring over time, or simple surface repair.
+                                                        Answer cautiously in 2-3 sentences, and clearly state that a professional on-site inspection is required before any real repair decision is made.
+                                                        Do not provide detailed engineering design or exact repair methods.
+                                                        """)
     }
 
     user_text = llava_questions.get(question, question) if question else (prompt_start).strip()
-    # messages = [{
-    #     "role": "user",
-    #     "content": [
-    #         {"type": "image"},
-    #         {"type": "text", "text": user_text},
-    #     ],
-    # }]
-
-    # # 모델용 템플릿 문자열 생성
-    # prompt_for_model = processor.apply_chat_template(
-    #     messages, add_generation_prompt=True, tokenize=False
-    # )
-
-    prompt_for_model = (
-        "USER: <image>\n"
-        f"{user_text}\n"
-        "ASSISTANT:"
-    )
+    if device=="mps":
+        messages = [{
+            "role": "user",
+            "content": [
+                {"type": "image"},
+                {"type": "text", "text": user_text},
+            ],
+        }]
+        # 모델용 템플릿 문자열 생성
+        prompt_for_model = processor.apply_chat_template(
+            messages, add_generation_prompt=True, tokenize=False
+        )
+    elif device=="cuda":
+        prompt_for_model = (
+            "USER: <image>\n"
+            f"{user_text}\n"
+            "ASSISTANT:"
+        )
 
     # 3. 모델 추론 실행
     processor.patch_size = model.config.vision_config.patch_size
     processor.vision_feature_select_strategy = model.config.vision_feature_select_strategy
-    ##inputs = processor(images=image, text=prompt_for_model, return_tensors="pt")
-    ##inputs = {k: v.to(device) for k, v in inputs.items()}
-    ##model.to(device)
+
     inputs = processor(
         text=prompt_for_model,
         images=image,
         return_tensors="pt",
     )
 
-    generate_ids = model.generate(**inputs, max_new_tokens=1500) # max_new_tokens로 답변 길이 조절
+    generate_ids = model.generate(**inputs, max_new_tokens=1000) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     # 4. 결과 출력
@@ -220,6 +231,10 @@ def run_llava(image_path: str, question: str | None):
     if question:
         korean_result = GoogleTranslator(source='en', target='ko').translate(english_result)
         formatted_korean = re.sub(r'(?<=[가-힣\w][다요함임]\.)+', '\n', korean_result).strip()
+        print("---- LLaVA 답변(eng) ----")
+        print(english_result)
+        print("---- LLaVA 답변(kor) ----")
+        print(formatted_korean)
         # '다.', '요.' 등으로 끝나고 공백이 이어질 때
         return formatted_korean
     else:
@@ -234,10 +249,6 @@ def run_llava(image_path: str, question: str | None):
 
         urgency_kr = urgency_choice.get(urgency, "분류 안됨")
 
-        print("----LLaVA 질문 프롬프트----")
-        print(user_text)
-        print("----LLaVA 답변----")
-        print(english_result)
         print("---- LLaVA 답변(eng) ----")
         print(f"Defect type: {defect_type}, Urgency: {urgency}")
         print("---- LLaVA 답변(kor) ----")
