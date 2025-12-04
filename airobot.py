@@ -29,7 +29,7 @@ IMAGE_PATH = "images/sample.jpg"
 # ----- 질문 목록 -----
 questions = {
     1: "이미지에 나타난 손상에 대해 분석 요약해주세요",
-    2: "이 손상의 위험도를 1~10 단계로 평가해주세요",
+    2: "어떤 조치가 필요할지 조언이 필요해요",
     3: "모든 손상 기록을 조회할게요",
     4: "캘린더에 보수 공사 일정을 추가할게요"
 }
@@ -65,7 +65,7 @@ class QuestionView(View):
 
         await interaction.response.defer(thinking=True, ephemeral=True)
         result = await asyncio.to_thread(
-            run_llava, self.image_url, questions[3]
+            run_llava, self.image_url, questions[2]
         )
         
         await interaction.followup.send(result)
