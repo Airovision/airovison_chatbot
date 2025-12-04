@@ -29,17 +29,19 @@ IMAGE_PATH = "images/sample.jpg"
 # ----- 질문 목록 -----
 questions = {
     1: "이미지에 나타난 손상에 대해 분석 요약해주세요",
-    2: "이 손상의 위험도를 1~10 단계로 평가해주세요",
+    2: "어떤 조치가 필요할지 조언이 필요해요",
     3: "모든 손상 기록을 조회할게요",
     4: "캘린더에 보수 공사 일정을 추가할게요"
 }
 
 # 버튼 UI 정의
 class QuestionView(View):
-    def __init__(self, image_url: str, defect_id: str):
+    def __init__(self, image_url: str, defect_id: str, defect_type: str, urgency: str):
         super().__init__(timeout=None)
         self.image_url = image_url
         self.defect_id = defect_id
+        self.defect_type = defect_type
+        self.urgency = urgency
         # (참고) self.defect_id를 사용해 LLaVA 분석 결과를 DB에 PATCH할 수 있음
 
 
@@ -50,10 +52,9 @@ class QuestionView(View):
 
         await interaction.response.defer(thinking=True, ephemeral=True) # 3초가 지나도 상호작용하게끔 thinking=True
         print(f"img url: {self.image_url}")
-        result = run_llava(self.image_url, questions[1])
-        # result = await asyncio.to_thread(
-        #     run_llava, self.image_url, questions[1]
-        # )
+        result = await asyncio.to_thread(
+            run_llava, self.image_url, questions[1], self.defect_id, self.defect_type, self.urgency
+        )
         
         await interaction.followup.send(result)
 
@@ -63,9 +64,9 @@ class QuestionView(View):
         await interaction.channel.send(
         f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
 
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        await interaction.response.defer(thinking=True)
         result = await asyncio.to_thread(
-            run_llava, self.image_url, questions[3]
+            run_llava, self.image_url, questions[2], self.defect_id, self.defect_type, self.urgency
         )
         
         await interaction.followup.send(result)
@@ -73,7 +74,7 @@ class QuestionView(View):
     @discord.ui.button(label=questions[3], style=discord.ButtonStyle.secondary)
     async def q4(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        await interaction.response.defer(thinking=True)
         try:
             await get_records(interaction.channel)
         except Exception as e:
@@ -98,8 +99,8 @@ async def send_defect_alert(defect: DefectOut, llava_summary: str):
         image_path = "." + defect.image
         discord_file = discord.File(image_path, filename=os.path.basename(image_path))
 
-        # 2. ⭐️ [수정] 동적 View 생성
-        view = QuestionView(image_url=image_path, defect_id=defect.id)
+        # 2. 동적 View 생성
+        view = QuestionView(image_url=image_path, defect_id=defect.id, defect_type=defect.defect_type, urgency=defect.urgency)
         
 
         await channel.send(content=llava_summary, file=discord_file, view=view)
