@@ -79,7 +79,7 @@ def _as_str(m): # re.Match 객체 str로 변환
     return m.group(1).strip() if isinstance(m, re.Match) else (m.strip() if isinstance(m, str) else "")
 
 
-def run_llava(image_path: str, question: str | None):
+def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_type: str|None, urgency:str|None):
     """
     디스코드 챗봇에서 호출용:
     image_path: 분석할 이미지 파일 경로
@@ -171,10 +171,14 @@ def run_llava(image_path: str, question: str | None):
 
 
     llava_questions = {
-        "이미지에 나타난 손상에 대해 분석 요약해주세요": textwrap.dedent("""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
+        "이미지에 나타난 손상에 대해 분석 요약해주세요": textwrap.dedent(f"""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
                                                                 Your analysis is NOT a substitute for a professional engineering inspection.
+                                                                For context, this damage has been previously classified as:
+                                                                - Defect type: {defect_type}
+                                                                - Preliminary urgency level: {urgency}
+                                                                You may use this information as a soft hint, but base your description primarily on what you can see in the image itself.
 
-                                                                Provide a concise but informative description in 3-4 sentences, in a natural conversational tone.
+                                                                Provide a concise but informative description in 3–4 sentences, in a natural conversational tone.
                                                                 Follow this pattern as closely as possible:
 
                                                                 "The damage in the image appears as [brief visual description of the damage: shape, size, location, and visible texture/color differences]. Based on this appearance, it could cause [potential issues or risks], and the urgency of repair appears to be [how urgent the repair seems, e.g., not very urgent / advisable in the near future / quite urgent]."
@@ -182,11 +186,13 @@ def run_llava(image_path: str, question: str | None):
                                                                 Replace the bracketed parts with your assessment based on the image.
                                                                 Do not add any extra sentences, lists, or sections outside this pattern.
                                                             """),
-        "어떤 조치가 필요할지 조언이 필요해요": textwrap.dedent("""Based only on the visible appearance of the damage in the image, what kind of follow-up actions would you tentatively recommend?
+        "어떤 조치가 필요할지 조언이 필요해요": textwrap.dedent(f"""Based only on the visible appearance of the damage in the image, and the following prior assessment:
+                                                        - Defect type: {defect_type}
+                                                        - Preliminary urgency level: {urgency}
+                                                        what kind of follow-up actions would you tentatively recommend?
                                                         For example, you may mention things like closer professional inspection, monitoring over time, or simple surface repair.
-                                                        Answer cautiously in 2-3 sentences, and clearly state that a professional on-site inspection is required before any real repair decision is made.
-                                                        Do not provide detailed engineering design or exact repair methods.
-                                                        """)
+                                                        Answer cautiously in 3-4 sentences, and clearly state that a professional on-site inspection is required before any real repair decision is made.
+                                                    """)
     }
 
     user_text = llava_questions.get(question, question) if question else (prompt_start).strip()

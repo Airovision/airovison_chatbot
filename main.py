@@ -28,10 +28,10 @@ async def lifespan(app: FastAPI):
     print("데이터베이스 초기화를 시작합니다...")
     await init_db()
     print(f"데이터베이스 준비 완료: {settings.DB_PATH.resolve()}")
-    # 2. ⭐️ LLaVA 모델 로드 (무거우므로 스레드에서)
+    # 2. LLaVA 모델 로드 (무거우므로 스레드에서)
     await asyncio.to_thread(load_llava_model)
     
-    # 3. ⭐️ Discord 봇 백그라운드 실행
+    # 3. Discord 봇 백그라운드 실행
     asyncio.create_task(client.start(discord_key))
 
     yield
@@ -124,8 +124,8 @@ async def run_analysis_and_notify(defect: DefectOut):
     POST 요청과는 별개로 실행되는 백그라운드 작업
     """
     try:
-        defect_type,  urgency = await asyncio.to_thread(run_llava, defect.image, None)
-        
+        defect_type,  urgency = await asyncio.to_thread(run_llava, defect.image, None, None, None, None)
+        # question, defect_id, defect_type, urgency는 None으로
         
         # 3. DB 갱신 (PATCH)
         #    (database.py에 patch_defect_in_db 함수가 필요합니다)
