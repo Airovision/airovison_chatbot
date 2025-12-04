@@ -64,7 +64,7 @@ class QuestionView(View):
         await interaction.channel.send(
         f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
 
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        await interaction.response.defer(thinking=True)
         result = await asyncio.to_thread(
             run_llava, self.image_url, questions[2], self.defect_id, self.defect_type, self.urgency
         )
@@ -74,7 +74,7 @@ class QuestionView(View):
     @discord.ui.button(label=questions[3], style=discord.ButtonStyle.secondary)
     async def q4(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        await interaction.response.defer(thinking=True)
         try:
             await get_records(interaction.channel)
         except Exception as e:
