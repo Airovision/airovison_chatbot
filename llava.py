@@ -2,9 +2,9 @@
 import torch, textwrap, re # 라바 답변 줄바꿈
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 from PIL import Image
-import os
 from deep_translator import GoogleTranslator # 번역 라이브러리
-
+from io import BytesIO
+import requests
 
 # LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
 _model = None
@@ -78,6 +78,16 @@ def load_llava_model():
 def _as_str(m): # re.Match 객체 str로 변환
     return m.group(1).strip() if isinstance(m, re.Match) else (m.strip() if isinstance(m, str) else "")
 
+def load_image(image_path: str, question: str|None)-> Image.Image:
+    # 1) S3 URL (http/https URL)인 경우
+    if image_path.startswith("http://") or image_path.startswith("https://"):
+        resp = requests.get(image_path, timeout=10)
+        resp.raise_for_status()
+        return Image.open(BytesIO(resp.content)).convert("RGB")
+
+    # 2) 로컬 경로인 경우 (기존 로직 유지)
+    local_path = image_path if question else "." + image_path
+    return Image.open(local_path).convert("RGB")
 
 def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_type: str|None, urgency:str|None):
     """
@@ -88,10 +98,8 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
 
     model, processor, device = load_llava_model()
 
-    # 2. 이미지와 프롬프트 입력받기
-    # ./images/sample.jpg
-    image_path = image_path if question else "."+image_path
-    image = Image.open(image_path)
+    # 2. 이미지와 프롬프트 입력받기 (로컬용/S3용 모두 호환됨)
+    image = load_image(image_path, question)
 
     # llava 질문(+배경지식 제공)
     prompt_start = textwrap.dedent(
@@ -114,50 +122,33 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     - Minor cracks usually appear as slightly darker lines compared to the surrounding concrete, with low color contrast.
     - Severe or deep cracks appear significantly darker, often nearly black, because the interior receives little to no light.
     - IMPORTANT: Even if the crack is thin, if it appears consistently dark or black along a long segment, treat it as a deeper or more severe crack. In such cases, assign Medium or High urgency rather than Low.
-    - IMPORTANT: if the crack looks like hair line, it is low
     - IMPORTANT: Only the surface is split; no thick concrete chunk is missing.
 
     2. Rebar Exposure:
     - Reinforcing steel bars are visible due to severe concrete loss.
     - Rebar may appear rusty, orange-brown, or metallic.
     - The surrounding concrete is deeply missing.
+    - Urgency is Classified as High.
     - IMPORTANT: If any rebar is visible, classify as Rebar Exposure (not Crack or Spalling).
 
     3. Concrete Spalling:
     - Thick concrete pieces have detached, creating a deep, rough, irregular cavity.
     - Much deeper and thicker than paint peeling.
     - Severity increases with depth, width, and size of the missing concrete.
+    - Urgency is classified as High or Medium (depends on depth, width, and size)
     - IMPORTANT: If rebar is visible, classify as Rebar Exposure instead.
 
     4. Paint Damage:
     - Only the outer paint layer is peeling or flaking.
      The underlying concrete remains intact.
     - The removed layer is thin, shallow, and mostly cosmetic.
-    - Usually classified as Low risk.
+    - Urgency is Classified as Low.
 
     5. None:
     - If the image does not match ANY of the above defect characteristics, classify as “None”.
     - Examples of NON-defects: window frames, door frames, panel seams, tile joints, shadows, reflections, dirt, stains.
     - Straight lines from structural elements must NOT be considered cracks.
     - If the category is "None", urgency also returns "None"
-
-    ===========================
-    URGENCY LEVEL DEFINITIONS
-    ===========================
-    High:
-    - The damage poses a serious structural or safety risk.
-    - Immediate inspection or repair is strongly recommended.
-    - Examples: exposed rebar, deep spalling, wide or growing cracks.
-
-    Medium:
-    - Not immediately dangerous but may worsen if untreated.
-    - Monitoring or near-term inspection is recommended.
-    - Examples: medium-sized cracks, early-stage spalling, repeated cracking.
-
-    Low:
-    - Does not currently threaten structural stability or safety.
-    - Regular maintenance or simple observation is sufficient.
-    - Examples: paint peeling, minor discoloration.
 
     ===========================
     INSTRUCTIONS FOR OUTPUT
@@ -186,7 +177,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
                                                                 Replace the bracketed parts with your assessment based on the image.
                                                                 Do not add any extra sentences, lists, or sections outside this pattern.
                                                             """),
-        "어떤 조치가 필요할지 조언이 필요해요": textwrap.dedent(f"""Based only on the visible appearance of the damage in the image, and the following prior assessment:
+        "어떤 조치가 필요할지 조언해주세요": textwrap.dedent(f"""Based only on the visible appearance of the damage in the image, and the following prior assessment:
                                                         - Defect type: {defect_type}
                                                         - Preliminary urgency level: {urgency}
                                                         what kind of follow-up actions would you tentatively recommend?
@@ -225,7 +216,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
         return_tensors="pt",
     )
 
-    generate_ids = model.generate(**inputs, max_new_tokens=1000) # max_new_tokens로 답변 길이 조절
+    generate_ids = model.generate(**inputs, max_new_tokens=1500) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     # 4. 결과 출력
