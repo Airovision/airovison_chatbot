@@ -5,11 +5,10 @@ from fastapi.staticfiles import StaticFiles
 from datetime import datetime, timezone
 from pathlib import Path
 import uuid
-import aiosqlite  # 비동기 SQLite 라이브러리
+import aiosqlite
 from contextlib import asynccontextmanager
 import shutil
 
-# ⭐️ 분리된 파일들에서 import
 from config import settings
 from models import DefectCreate, DefectOut, DefectPatch
 from database import init_db, create_defect_in_db, db_row_to_model
@@ -17,10 +16,11 @@ from llava import load_llava_model, run_llava
 from airobot import *
 import asyncio
 from map import *
+from s3_utils import upload_to_s3
 
-from dotenv import load_dotenv # .env 로드
+from dotenv import load_dotenv
 
-# .env 로드 (가장 먼저 실행)
+# .env 로드
 load_dotenv()
 
 @asynccontextmanager
@@ -28,10 +28,11 @@ async def lifespan(app: FastAPI):
     print("데이터베이스 초기화를 시작합니다...")
     await init_db()
     print(f"데이터베이스 준비 완료: {settings.DB_PATH.resolve()}")
-    # 2. LLaVA 모델 로드 (무거우므로 스레드에서)
+
+    # LLaVA 모델 로드 (무거우므로 스레드에서)
     await asyncio.to_thread(load_llava_model)
     
-    # 3. Discord 봇 백그라운드 실행
+    # Discord 봇 백그라운드 실행
     asyncio.create_task(client.start(discord_key))
 
     yield
@@ -57,7 +58,7 @@ app = FastAPI(
 )
 
 
-# ----- 3. 정적 파일 마운트 (로컬 개발용) -----
+# ----- 정적 파일 마운트 (로컬 개발용) -----
 # 이렇게 하면 "data/images/image.jpg" 파일을
 # "http://서버주소/data/images/image.jpg" URL로 접근 가능
 # "data" 디렉토리를 "/data" URL 경로에 연결
@@ -156,34 +157,50 @@ async def run_analysis_and_notify(defect: DefectOut):
         # (오류 발생 시 Discord로 오류 알림을 보낼 수도 있음)
 
 
+# @app.post(
+#     "/upload-img",
+#     summary="[개발용] 로컬 이미지 업로드",
+#     description="로컬 개발 시 파일 업로드를 위한 헬퍼 API입니다. 배포 시 S3로 대체될 예정입니다."
+# )
+# async def upload_image_dev(file: UploadFile = File(...)):
+#     """
+#     (개발용)
+#     이미지 파일을 받아 서버 로컬(/data/images)에 저장하고
+#     접근 가능한 URL을 반환합니다.
+#     """
+#     try:
+#         file_extension = Path(file.filename).suffix
+#         file_name = f"{uuid.uuid4()}{file_extension}"
+#         file_path = settings.UPLOADS_DIR / file_name
+
+#         with open(file_path, "wb") as buffer:
+#             shutil.copyfileobj(file.file, buffer)
+            
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
+#     finally:
+#         file.file.close()
+
+#     # /data/images/파일명.jpg 형식의 URL 반환
+#     image_url_path = f"{settings.STATIC_MOUNT_PATH}/{settings.UPLOADS_DIR_NAME}/{file_name}"
+    
+#     return {"url": image_url_path}
+
 @app.post(
     "/upload-img",
-    summary="[개발용] 로컬 이미지 업로드",
-    description="로컬 개발 시 파일 업로드를 위한 헬퍼 API입니다. 배포 시 S3로 대체될 예정입니다."
+    summary="[배포용] S3 이미지 업로드",
+    description="업로드된 이미지를 S3에 저장하고, 접근 가능한 URL을 반환합니다."
 )
-async def upload_image_dev(file: UploadFile = File(...)):
+async def upload_image_s3(file: UploadFile = File(...)):
     """
-    (개발용)
-    이미지 파일을 받아 서버 로컬(/data/images)에 저장하고
-    접근 가능한 URL을 반환합니다.
+    이미지를 S3 버킷에 업로드하고 S3 public URL을 반환합니다.
     """
     try:
-        file_extension = Path(file.filename).suffix
-        file_name = f"{uuid.uuid4()}{file_extension}"
-        file_path = settings.UPLOADS_DIR / file_name
+        s3_url = await upload_to_s3(file)
+        return {"url": s3_url}
 
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"파일 저장 실패: {e}")
-    finally:
-        file.file.close()
-
-    # /data/images/파일명.jpg 형식의 URL 반환
-    image_url_path = f"{settings.STATIC_MOUNT_PATH}/{settings.UPLOADS_DIR_NAME}/{file_name}"
-    
-    return {"url": image_url_path}
+        raise HTTPException(status_code=500, detail=f"S3 업로드 실패: {e}")
 
 
 # ----- 5. 서버 실행 -----
@@ -191,5 +208,5 @@ if __name__ == "__main__":
     print("--- ⭐️ 개발용 서버 모드 ⭐️ ---")
     print(f"DB 위치: {settings.DB_PATH.resolve()}")
     print(f"업로드 폴더: {settings.UPLOADS_DIR.resolve()}")
-    print(f"정적 파일 URL: http://127.0.0.1:8000{settings.STATIC_MOUNT_PATH}/")
+    print(f"정적 파일 URL: http://34.218.88.107:8000{settings.STATIC_MOUNT_PATH}/")
     uvicorn.run(app, host="0.0.0.0", port=8000)
