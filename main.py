@@ -2,7 +2,7 @@ from PIL import Image
 import uvicorn
 from fastapi import FastAPI, HTTPException, Body, File, UploadFile, Form
 from fastapi.staticfiles import StaticFiles
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import uuid
 import aiosqlite
@@ -86,7 +86,8 @@ async def create_defect_info(defect: DefectCreate = Body(...)):
     if defect.detect_time:
         detect_time = defect.detect_time
     else:
-        detect_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        KST = timezone(timedelta(hours=9))
+        detect_time = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
 
     # 주소 설정
     address = get_address_from_coords(defect.latitude, defect.longitude)
