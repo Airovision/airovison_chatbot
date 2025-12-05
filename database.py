@@ -59,7 +59,6 @@ async def create_defect_in_db(defect: DefectOut) -> Optional[DefectOut]:
             await db.commit()
         return defect
     except aiosqlite.Error as e:
-        print(f"DB INSERT 오류: {e}")
         return None
     
 
@@ -99,7 +98,6 @@ async def patch_defect_in_db(defect_id: str, patch_data) -> Optional[DefectOut]:
             await db.commit()
 
     except aiosqlite.Error as e:
-        print(f"❌ 데이터베이스 업데이트 실패: {e}")
         return None
     
     return updated_defect
@@ -138,5 +136,5 @@ async def get_all_defects_from_db(sort_by_urgency: bool = False) -> List[DefectO
                 rows = await cursor.fetchall()
                 return [db_row_to_model(row) for row in rows]
     except aiosqlite.Error as e:
-        print(f"❌ DB 조회 오류: {e}")
+        print(f"❌ DB 조회 실패: {e}")
         return []

@@ -78,19 +78,18 @@ app.mount(
     description="드론에서 촬영한 이미지와 시간 정보를 받아 새 손상 데이터를 생성합니다."
 )
 
-async def create_defect_info(defect: DefectCreate = Body(...)):    
-    # 고유 ID 생성
+async def create_defect_info(defect: DefectCreate = Body(...)):
     new_id = str(uuid.uuid4())
     
-    # 감지 시간 설정 (클라이언트가 안 보냈으면 서버가 UTC로 생성)
+    # 시간 설정
     if defect.detect_time:
         detect_time = defect.detect_time
     else:
         detect_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
+    # 주소 설정
     address = get_address_from_coords(defect.latitude, defect.longitude)
 
-    # 최종 저장될 DefectOut 모델 객체 생성
     new_defect_data = DefectOut(
         id=new_id,
         latitude=defect.latitude,
@@ -100,14 +99,14 @@ async def create_defect_info(defect: DefectCreate = Body(...)):
         address=address
     )
 
-    # DB에 해당 객체 데이터 연결
     saved_defect = await create_defect_in_db(new_defect_data)
     if not saved_defect:
-        raise HTTPException(status_code=500, detail="DB 저장 실패")
+        raise HTTPException(status_code=500, detail="❌ DB 생성 실패")
     
     final_defect = await run_analysis_and_notify(saved_defect)
     if final_defect is None:
-        raise HTTPException(status_code=500, detail="데이터베이스 저장에 실패했습니다.")
+        raise HTTPException(status_code=500, detail="❌ DB 업데이트 실패")
+    
     return final_defect
 
 #----- 백그라운드 작업 함수 -----
