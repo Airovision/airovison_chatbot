@@ -67,16 +67,20 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 def get_calendar_service():
     creds = None
+
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            ccreds = flow.run_console()
+            creds = flow.run_console()
+
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
+
     return build('calendar', 'v3', credentials=creds)
 
 def add_to_calendar(date: str, summary: str, description: str):
@@ -88,6 +92,7 @@ def add_to_calendar(date: str, summary: str, description: str):
         'end': {'date': date, 'timeZone': 'Asia/Seoul'}
     }
     created_event = service.events().insert(calendarId='primary', body=event).execute()
+    
     return created_event.get('htmlLink')
 
 
