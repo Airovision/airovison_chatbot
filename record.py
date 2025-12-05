@@ -11,7 +11,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
-from database import get_all_defects_from_db, delete_old_defects
+from database import get_all_defects_from_db
 from models import DefectOut
 from typing import List
 
@@ -19,7 +19,6 @@ from typing import List
 # ----- DB 연동 손상 기록 조회 -----
 async def get_records(channel: discord.TextChannel):
     try:
-        await delete_old_defects(days=30)
         records: List[DefectOut] = await get_all_defects_from_db(sort_by_urgency=True)
     except Exception as e:
         await channel.send(f"❌ DB 조회 중 오류가 발생했습니다: {e}")
@@ -103,12 +102,24 @@ class DateInputModal(discord.ui.Modal, title="보수 공사 일정 입력"):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             selected_date = datetime.datetime.strptime(self.date.value, "%Y-%m-%d").date()
-            event_link = add_to_calendar(selected_date.isoformat(), "건물 외벽 보수 공사", f"{interaction.user.display_name}님 요청")
+        except ValueError as e:
+            await interaction.response.send_message(
+                f"❌ 잘못된 날짜 형식입니다. YYYY-MM-DD 형식으로 입력해주세요.",
+                ephemeral=True
+            )
+            return
+        
+        try:            
+            event_link = add_to_calendar(
+                selected_date.isoformat(), 
+                "건물 외벽 보수 공사", 
+                f"{interaction.user.display_name}님 요청"
+            )
+
             await interaction.response.send_message(
                 f"✅ **보수 공사 일정 확정**\n\n"
                 f"{interaction.user.mention}님이 요청하신 보수 공사 일정이 **{selected_date}**에 추가되었습니다.\n"
-                f"📅 캘린더에서 보기({event_link})",
-                ephemeral=True
+                f"📅 캘린더에서 보기({event_link})"
             )
         except Exception as e:
-            await interaction.response.send_message(f"❌ 잘못된 날짜 형식입니다. ({e})", ephemeral=True)
+            await interaction.response.send_message(f"❌ 캘린더 등록 실패: {e}", ephemeral=True)
