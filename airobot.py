@@ -7,13 +7,15 @@ from discord.ui import View, Button
 from dotenv import load_dotenv
 import httpx
 
-
 from llava import run_llava
 from record import *
 from models import *
 from database import *
 from io import BytesIO
-load_dotenv() # .env 파일의 환경변수 가져오기
+
+
+# .env 로드
+load_dotenv()
 
 
 # ----- Discord 설정 -----
@@ -35,7 +37,7 @@ questions = {
     4: "캘린더에 보수 공사 일정을 추가할게요"
 }
 
-# 버튼 UI 정의
+# ----- 버튼 UI 정의 -----
 class QuestionView(View):
     def __init__(self, image_url: str, defect_id: str, defect_type: str, urgency: str):
         super().__init__(timeout=None)
@@ -43,15 +45,13 @@ class QuestionView(View):
         self.defect_id = defect_id
         self.defect_type = defect_type
         self.urgency = urgency
-        # (참고) self.defect_id를 사용해 LLaVA 분석 결과를 DB에 PATCH할 수 있음
 
-
-    @discord.ui.button(label=questions[1], style=discord.ButtonStyle.primary) # 첫번째 질문 버튼
+    # Q1 버튼 - "이미지에 나타난 손상에 대해 분석 요약해주세요"
+    @discord.ui.button(label=questions[1], style=discord.ButtonStyle.primary)
     async def q1(self, interaction: discord.Interaction, button: Button):
-        await interaction.channel.send( # 어떤 버튼 눌렀는지 알림
-        f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
+        await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
 
-        await interaction.response.defer(thinking=True, ephemeral=True) # 3초가 지나도 상호작용하게끔 thinking=True
+        await interaction.response.defer(thinking=True, ephemeral=True)
         print(f"img url: {self.image_url}")
         result = await asyncio.to_thread(
             run_llava, self.image_url, questions[1], self.defect_id, self.defect_type, self.urgency
@@ -59,11 +59,10 @@ class QuestionView(View):
         
         await interaction.followup.send(result)
 
-
-    @discord.ui.button(label=questions[2], style=discord.ButtonStyle.primary) # 세번째 질문 버튼
+    # Q2 버튼 - "어떤 조치가 필요할지 조언해주세요"
+    @discord.ui.button(label=questions[2], style=discord.ButtonStyle.primary)
     async def q3(self, interaction: discord.Interaction, button: Button):
-        await interaction.channel.send(
-        f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
+        await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
 
         await interaction.response.defer(thinking=True)
         result = await asyncio.to_thread(
@@ -72,34 +71,40 @@ class QuestionView(View):
         
         await interaction.followup.send(result)
 
+    # Q3 - "모든 손상 기록을 조회할게요"
     @discord.ui.button(label=questions[3], style=discord.ButtonStyle.secondary)
     async def q4(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
+        
         await interaction.response.defer(thinking=True)
         try:
             await get_records(interaction.channel)
         except Exception as e:
             await interaction.followup.send(f"❌ 서버 연결 오류: {e}")
 
+    # Q4 - "캘린더에 보수 공사 일정을 추가할게요"
     @discord.ui.button(label=questions[4], style=discord.ButtonStyle.secondary)
     async def q5(self, interaction: discord.Interaction, button: Button):
+        await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
+
         await interaction.response.send_modal(DateInputModal())
 
 
 # ----- FastAPI가 호출할 알림 함수 -----
 async def send_defect_alert(defect: DefectOut, llava_summary: str):
     """
-    FastAPI 서버가 LLaVA 분석 후 호출하는 함수
+    FastAPI 서버가 LLaVA 분석 후 호출하는 함수입니다.
     """
+
     try:
         channel = client.get_channel(CHANNEL_ID)
         if not channel:
             print(f"❌ 알림 실패: 채널(ID: {CHANNEL_ID})을 찾을 수 없음")
             return
 
-        image_url = defect.image  # DB에 저장된 값 (S3 URL 또는 로컬 경로)
+        image_url = defect.image
 
-        # 1) S3 URL(http/https URL)인 경우 → requests로 받아서 Discord 파일로
+        # 1) S3 URL인 경우
         if image_url.startswith("http://") or image_url.startswith("https://"):
             try:
                 resp = requests.get(image_url, timeout=10)
@@ -119,12 +124,10 @@ async def send_defect_alert(defect: DefectOut, llava_summary: str):
             # 2) 로컬 경로인 경우
             image_path = "." + image_url
             discord_file = discord.File(image_path, filename=os.path.basename(image_path))
-            view_image_url = image_path  # View에서 쓸 이미지 경로
+            view_image_url = image_path
 
-        # 2. 동적 View 생성
         view = QuestionView(image_url=view_image_url, defect_id=defect.id, defect_type=defect.defect_type, urgency=defect.urgency)
         
-
         await channel.send(content=llava_summary, file=discord_file, view=view)
         print(f"✅ Discord 알림 전송 완료 (ID: {defect.id})")
 
@@ -137,9 +140,11 @@ async def send_defect_alert(defect: DefectOut, llava_summary: str):
 async def on_ready():
     print("---" * 10)
     print(f"✅ Discord 봇 로그인 완료: {client.user}")
+
     channel = client.get_channel(CHANNEL_ID)
     if channel:
         print(f"✅ 알림 채널 준비 완료: #{channel.name}")
     else:
         print(f"❌ 채널을 찾을 수 없습니다. CHANNEL_ID를 확인하세요.")
+        
     print("---" * 10)
