@@ -8,3 +8,4 @@ data/
 llava_test.py
 test_image/
 .DS_Store
+reference_images/
