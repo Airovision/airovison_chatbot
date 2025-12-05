@@ -11,7 +11,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
-from database import get_all_defects_from_db 
+from database import get_all_defects_from_db, delete_old_defects
 from models import DefectOut
 from typing import List
 
@@ -19,6 +19,7 @@ from typing import List
 # ----- DB 연동 손상 기록 조회 -----
 async def get_records(channel: discord.TextChannel):
     try:
+        await delete_old_defects(days=30)
         records: List[DefectOut] = await get_all_defects_from_db(sort_by_urgency=True)
     except Exception as e:
         await channel.send(f"❌ DB 조회 중 오류가 발생했습니다: {e}")

@@ -1,6 +1,8 @@
 import aiosqlite
 from pathlib import Path
 from typing import Optional, List
+from datetime import datetime, timedelta, timezone
+
 from models import *
 from config import settings
 
@@ -138,3 +140,26 @@ async def get_all_defects_from_db(sort_by_urgency: bool = False) -> List[DefectO
     except aiosqlite.Error as e:
         print(f"❌ DB 조회 실패: {e}")
         return []
+
+
+# ----- 오래된 defect 삭제 -----
+async def delete_old_defects(days: int = 30):
+    """
+    현재 시각 기준으로 'detect_time' 이 30일 이상 지난 손상 기록을 삭제합니다.
+    """
+
+    threshold = datetime.now(timezone.utc) - timedelta(days=days)
+    threshold_iso = threshold.isoformat().replace("+00:00", "Z")
+
+    sql = """
+          DELETE FROM defects
+           WHERE detect_time < ?
+          """
+
+    try:
+        async with aiosqlite.connect(settings.DB_PATH) as db:
+            await db.execute(sql, (threshold_iso,))
+            await db.commit()
+        print(f"🗑️ {days}일 이상 지난 손상 기록을 삭제했습니다.")
+    except aiosqlite.Error as e:
+        print(f"❌ 오래된 데이터 삭제 실패: {e}")
