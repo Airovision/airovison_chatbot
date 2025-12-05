@@ -160,6 +160,6 @@ async def delete_old_defects(days: int = 30):
         async with aiosqlite.connect(settings.DB_PATH) as db:
             await db.execute(sql, (threshold_iso,))
             await db.commit()
-        print(f"🗑️ {days}일 이상 지난 손상 기록을 삭제했습니다.")
+        print(f"✅ {days}일 이상 지난 손상 기록 삭제 완료")
     except aiosqlite.Error as e:
         print(f"❌ 오래된 데이터 삭제 실패: {e}")

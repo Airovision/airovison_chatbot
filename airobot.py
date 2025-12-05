@@ -51,7 +51,7 @@ class QuestionView(View):
     async def q1(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
 
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        await interaction.response.defer(thinking=True)
         print(f"img url: {self.image_url}")
         result = await asyncio.to_thread(
             run_llava, self.image_url, questions[1], self.defect_id, self.defect_type, self.urgency
