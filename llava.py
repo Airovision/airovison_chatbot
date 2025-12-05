@@ -120,6 +120,8 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     - Severe or deep cracks(urgency:high) appear significantly darker, often nearly black, because the interior receives little to no light.
     - IMPORTANT: Even if the crack is thin, if it appears consistently dark or black along a long segment, treat it as a deeper or more severe crack. In such cases, assign Medium or High urgency rather than Low.
     - IMPORTANT: Only the surface is split; missing the thick concrete chunk is Concrete Spalling.
+    - When rating the severity (Low / Medium / High), avoid being overly conservative. Do not automatically choose Medium; use Low or High when the visible evidence clearly supports it.
+
 
     2. Rebar Exposure:
     - “Exposed rebar” means that reinforcing steel bars, which should be covered by concrete, are visible because the concrete around them has been damaged or lost. This exposes the steel to corrosion and can weaken the structure.
@@ -175,6 +177,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
 
                                                                 Replace the bracketed parts with your assessment based on the image.
                                                                 Do not add any extra sentences, lists, or sections outside this pattern.
+                                                                Please answer in 4–5 full sentences with a detailed explanation.
                                                             """),
         "어떤 조치가 필요할지 조언해주세요": textwrap.dedent(f"""You should answer as if you were an experienced building inspection assistant who is used to explaining damage and suggesting general maintenance directions.
                                                         Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
@@ -190,6 +193,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
                                                         Avoid generic answers that only say “a professional inspection is needed.”  
                                                         First, provide concrete but cautious observations and general recommendations.  
                                                         Only at the end of your answer, add one short sentence noting that a professional on-site inspection is required before any final repair decision.
+                                                        Please answer in 4–5 full sentences with a detailed explanation.
                                                         """)
     }
 
@@ -224,7 +228,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
         return_tensors="pt",
     )
 
-    generate_ids = model.generate(**inputs, max_new_tokens=1700) # max_new_tokens로 답변 길이 조절
+    generate_ids = model.generate(**inputs, max_new_tokens=2000) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     # 결과 출력(프롬프트를 제외한 순수 답변 부분만 추출)
