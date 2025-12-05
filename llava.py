@@ -33,10 +33,9 @@ def load_llava_model():
     if _model is not None and _processor is not None:
         return _model, _processor, _device
 
-    # 1. 모델과 프로세서 준비
+    # 모델과 프로세서 준비
     model_id = "llava-hf/llava-1.5-7b-hf"
     revision = "a272c74"
-
     
     if torch.backends.mps.is_available(): # 맥북 gpu
         _device = "mps"
@@ -44,9 +43,8 @@ def load_llava_model():
         _device = "cuda"
     else:
         _device = "cpu"
-
     
-    # # 4-bit 양자화 설정 (메모리 절약을 위해 필수!)-> cuda 전용
+    # Cuda 4-bit 양자화 설정
     if _device == "cuda":
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -56,7 +54,7 @@ def load_llava_model():
         quantization_config = None
     
     # 모델 로드
-    print("--- LLaVA 모델 불러오는 중... ---")
+    print("----- LLaVA 모델 불러오는 중 -----")
     _model = LlavaForConditionalGeneration.from_pretrained(
         model_id,
         revision=revision,
@@ -65,40 +63,40 @@ def load_llava_model():
         device_map="auto"
     )
 
-    # Processor: fast → 실패 시 slow
     try:
         _processor = AutoProcessor.from_pretrained(model_id, revision=revision)
     except Exception as e:
-       print("Processor load failed:", e)
+       print(f"❌ 프로세서 로드 실패: {e}")
        raise
+
     print("✅ LLaVA 모델 로드 완료")
     
     return _model, _processor, _device
 
-def _as_str(m): # re.Match 객체 str로 변환
+def _as_str(m):
     return m.group(1).strip() if isinstance(m, re.Match) else (m.strip() if isinstance(m, str) else "")
 
 def load_image(image_path: str, question: str|None)-> Image.Image:
-    # 1) S3 URL (http/https URL)인 경우
+    # 1) S3 URL인 경우
     if image_path.startswith("http://") or image_path.startswith("https://"):
         resp = requests.get(image_path, timeout=10)
         resp.raise_for_status()
         return Image.open(BytesIO(resp.content)).convert("RGB")
 
-    # 2) 로컬 경로인 경우 (기존 로직 유지)
+    # 2) 로컬 경로인 경우
     local_path = image_path if question else "." + image_path
     return Image.open(local_path).convert("RGB")
 
 def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_type: str|None, urgency:str|None):
     """
     디스코드 챗봇에서 호출용:
-    image_path: 분석할 이미지 파일 경로
-    question: 버튼으로 받은 한국어 질문
+        image_path: 분석할 이미지 파일 경로
+        uestion: 버튼으로 받은 한국어 질문
     """
-
+    
     model, processor, device = load_llava_model()
 
-    # 2. 이미지와 프롬프트 입력받기 (로컬용/S3용 모두 호환됨)
+    # 이미지와 프롬프트 입력받기
     image = load_image(image_path, question)
 
     # llava 질문(+배경지식 제공)
@@ -195,6 +193,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
                 {"type": "text", "text": user_text},
             ],
         }]
+
         # 모델용 템플릿 문자열 생성
         prompt_for_model = processor.apply_chat_template(
             messages, add_generation_prompt=True, tokenize=False
@@ -206,7 +205,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
             "ASSISTANT:"
         )
 
-    # 3. 모델 추론 실행
+    # 모델 추론 실행
     processor.patch_size = model.config.vision_config.patch_size
     processor.vision_feature_select_strategy = model.config.vision_feature_select_strategy
 
@@ -219,23 +218,18 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     generate_ids = model.generate(**inputs, max_new_tokens=1500) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
-    # 4. 결과 출력
-    # 프롬프트를 제외한 순수 답변 부분만 추출
+    # 결과 출력(프롬프트를 제외한 순수 답변 부분만 추출)
     english_result = english_result_full.split("ASSISTANT:")[-1].strip()
-
-
 
     if question:
         korean_result = GoogleTranslator(source='en', target='ko').translate(english_result)
         formatted_korean = re.sub(r'(?<=[가-힣\w][다요함임]\.)+', '\n', korean_result).strip()
-        print("---- LLaVA 답변(eng) ----")
+        print("--- LLaVA 답변(eng) ---")
         print(english_result)
-        print("---- LLaVA 답변(kor) ----")
+        print("--- LLaVA 답변(kor) ---")
         print(formatted_korean)
-        # '다.', '요.' 등으로 끝나고 공백이 이어질 때
         return formatted_korean
     else:
-        #각 항목 추출
         m_type = re.search(r"Defect Type:\s*(.+)", english_result)
         m_urg = re.search(r"Urgency for Inspection:\s*(.+)", english_result)
 
@@ -246,8 +240,8 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
 
         urgency_kr = urgency_choice.get(urgency, "분류 안됨")
 
-        print("---- LLaVA 답변(eng) ----")
+        print("--- LLaVA 답변(eng) ---")
         print(f"Defect type: {defect_type}, Urgency: {urgency}")
-        print("---- LLaVA 답변(kor) ----")
+        print("--- LLaVA 답변(kor) ---")
         print(f"손상 유형: {defect_type_kr}, 위험도: {urgency_kr}")
         return defect_type_kr, urgency_kr

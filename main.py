@@ -20,16 +20,18 @@ from s3_utils import upload_to_s3
 
 from dotenv import load_dotenv
 
+
 # .env 로드
 load_dotenv()
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("데이터베이스 초기화를 시작합니다...")
+    print("----- 데이터베이스 초기화 중 -----")
     await init_db()
-    print(f"데이터베이스 준비 완료: {settings.DB_PATH.resolve()}")
+    print(f"✅ 데이터베이스 준비 완료: {settings.DB_PATH.resolve()}")
 
-    # LLaVA 모델 로드 (무거우므로 스레드에서)
+    # LLaVA 모델 로드
     await asyncio.to_thread(load_llava_model)
     
     # Discord 봇 백그라운드 실행
@@ -37,7 +39,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    print("애플리케이션을 종료합니다.")
+    print("----- 애플리케이션 종료 -----")
     await client.close()
 
 
@@ -54,30 +56,20 @@ app = FastAPI(
         "🔔 Discord 챗봇 연동 손상 알림 및 상호작용"
     ),
     version="1.0.0",
-    lifespan=lifespan # 앱 시작/종료 시 lifespan 함수 실행
+    lifespan=lifespan
 )
 
 
-# ----- 정적 파일 마운트 (로컬 개발용) -----
-# 이렇게 하면 "data/images/image.jpg" 파일을
-# "http://서버주소/data/images/image.jpg" URL로 접근 가능
-# "data" 디렉토리를 "/data" URL 경로에 연결
+# ----- 정적 파일 마운트 (개발용) -----
 app.mount(
     settings.STATIC_MOUNT_PATH,
-    StaticFiles(directory=settings.DATA_DIR.name), # "data"
+    StaticFiles(directory=settings.DATA_DIR.name),
     name="data"
 )
 
 
-    # """
-    # (배포용/개발용 공통)
-    # 1. 드론에서 JSON (좌표 + 이미지 URL)을 받습니다.
-    # 2. DB에 '미완성' 상태로 즉시 저장하고 드론에게 응답합니다.
-    # 3. [백그라운드] LLaVA 분석을 실행합니다.
-    # 4. [백그라운드] LLaVA 결과를 DB에 PATCH(갱신)합니다.
-    # 5. [백그라운드] Discord로 알림을 보냅니다.
-    # """
 # ----- API 엔드포인트 -----
+# [드론용] 새로운 손상 정보 생성 API
 @app.post(
     "/defect-info",
     response_model=DefectOut,
@@ -85,31 +77,30 @@ app.mount(
     summary="[드론용] 새로운 손상 정보 생성",
     description="드론에서 촬영한 이미지와 시간 정보를 받아 새 손상 데이터를 생성합니다."
 )
-async def create_defect_info(defect: DefectCreate = Body(...)):
-    
-    # 1. 고유 ID 생성
+
+async def create_defect_info(defect: DefectCreate = Body(...)):    
+    # 고유 ID 생성
     new_id = str(uuid.uuid4())
     
-    # 2. 감지 시간 설정 (클라이언트가 안 보냈으면 서버가 UTC로 생성)
+    # 감지 시간 설정 (클라이언트가 안 보냈으면 서버가 UTC로 생성)
     if defect.detect_time:
         detect_time = defect.detect_time
     else:
-        # ISO 8601 형식 + UTC (Z)
         detect_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
     address = get_address_from_coords(defect.latitude, defect.longitude)
 
-    # 3. 최종 저장될 DefectOut 모델 객체 생성
+    # 최종 저장될 DefectOut 모델 객체 생성
     new_defect_data = DefectOut(
         id=new_id,
         latitude=defect.latitude,
         longitude=defect.longitude,
-        image=defect.image, # 클라이언트가 제공한 이미지 url
+        image=defect.image,
         detect_time=detect_time,
         address=address
     )
 
-    # 4. db에 해당 객체 데이터 연결(삽입)
+    # DB에 해당 객체 데이터 연결
     saved_defect = await create_defect_in_db(new_defect_data)
     if not saved_defect:
         raise HTTPException(status_code=500, detail="DB 저장 실패")
@@ -119,26 +110,25 @@ async def create_defect_info(defect: DefectCreate = Body(...)):
         raise HTTPException(status_code=500, detail="데이터베이스 저장에 실패했습니다.")
     return final_defect
 
-#----- 4. 백그라운드 작업 함수 -----
+#----- 백그라운드 작업 함수 -----
 async def run_analysis_and_notify(defect: DefectOut):
     """
-    POST 요청과는 별개로 실행되는 백그라운드 작업
+    POST 요청과는 별개로 실행되는 백그라운드 작업입니다.
     """
+
     try:
         defect_type,  urgency = await asyncio.to_thread(run_llava, defect.image, None, None, None, None)
-        # question, defect_id, defect_type, urgency는 None으로
         
-        # 3. DB 갱신 (PATCH)
-        #    (database.py에 patch_defect_in_db 함수가 필요합니다)
+        # DB 업데이트
         patch_data = DefectPatch(defect_type=defect_type, urgency=urgency)
         updated_defect = await patch_defect_in_db(defect.id, patch_data)
 
         if  updated_defect is None:
             raise HTTPException(status_code=404, detail=f"Defect ID '{defect.id}'를 찾을 수 없습니다.")
         
-        print(f"✅ DB 갱신 완료 (ID: {defect.id})")
+        print(f"✅ DB 업데이트 완료 (ID: {defect.id})")
 
-        # 4. ⭐️ Discord 알림 전송 (discord_bot.py의 함수 호출)
+        # Discord 알림 전송
         llava_summary = "🚨 손상 감지 🚨\n" \
             "새로운 외벽 손상이 탐지되었습니다. 아래의 정보를 확인하세요.\n" \
             f"📍 위치: {defect.address}\n" \
@@ -151,12 +141,10 @@ async def run_analysis_and_notify(defect: DefectOut):
         
     except Exception as e:
         print(f"❌ 백그라운드 작업 실패 (ID: {defect.id}): {e} : {type(e)}")
-        # ⭐️ [중요] 'import'와 'traceback' 두 줄을 추가합니다.
         import traceback
-        traceback.print_exc() # 전체 오류 로그 출력
-        # (오류 발생 시 Discord로 오류 알림을 보낼 수도 있음)
+        traceback.print_exc()
 
-
+# [개발용] 로컬 이미지 업로드 API
 @app.post(
     "/upload-img-dev",
     summary="[개발용] 로컬 이미지 업로드",
@@ -168,6 +156,7 @@ async def upload_image_dev(file: UploadFile = File(...)):
     이미지 파일을 받아 서버 로컬(/data/images)에 저장하고
     접근 가능한 URL을 반환합니다.
     """
+
     try:
         file_extension = Path(file.filename).suffix
         file_name = f"{uuid.uuid4()}{file_extension}"
@@ -181,20 +170,22 @@ async def upload_image_dev(file: UploadFile = File(...)):
     finally:
         file.file.close()
 
-    # /data/images/파일명.jpg 형식의 URL 반환
     image_url_path = f"{settings.STATIC_MOUNT_PATH}/{settings.UPLOADS_DIR_NAME}/{file_name}"
     
     return {"url": image_url_path}
 
+# [배포용] S3 이미지 업로드 API
 @app.post(
     "/upload-img",
     summary="[배포용] S3 이미지 업로드",
     description="업로드된 이미지를 S3에 저장하고, 접근 가능한 URL을 반환합니다."
 )
+
 async def upload_image_s3(file: UploadFile = File(...)):
     """
     이미지를 S3 버킷에 업로드하고 S3 public URL을 반환합니다.
     """
+
     try:
         s3_url = await upload_to_s3(file)
         return {"url": s3_url}
@@ -203,10 +194,10 @@ async def upload_image_s3(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"S3 업로드 실패: {e}")
 
 
-# ----- 5. 서버 실행 -----
+# ----- 서버 실행 -----
 if __name__ == "__main__":
-    print("--- ⭐️ 개발용 서버 모드 ⭐️ ---")
-    print(f"DB 위치: {settings.DB_PATH.resolve()}")
-    print(f"업로드 폴더: {settings.UPLOADS_DIR.resolve()}")
-    print(f"정적 파일 URL: http://34.218.88.107:8000{settings.STATIC_MOUNT_PATH}/")
+    print("----- 서버 시작 중 -----")
+    print(f"✅ DB 위치: {settings.DB_PATH.resolve()}")
+    print(f"✅ 업로드 폴더: {settings.UPLOADS_DIR.resolve()}")
+    print(f"✅ 정적 파일 URL: http://34.218.88.107:8000{settings.STATIC_MOUNT_PATH}/")
     uvicorn.run(app, host="0.0.0.0", port=8000)
