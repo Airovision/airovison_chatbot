@@ -11,7 +11,6 @@ _model = None
 _processor = None
 _device = None
 
-REF_DIR = "./reference_images" # ICL 기법 프롬프트에 들어갈 예시 사진들
 
 # 손상 유형
 defect_type_choice = {
@@ -91,7 +90,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     """
     디스코드 챗봇에서 호출용:
         image_path: 분석할 이미지 파일 경로
-        uestion: 버튼으로 받은 한국어 질문
+        question: 버튼으로 받은 한국어 질문
     """
     
     model, processor, device = load_llava_model()
@@ -103,8 +102,8 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     prompt_start = textwrap.dedent(
     """
     You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
-    Your analysis is NOT a substitute for a professional engineering inspection.
     Analyze the image carefully and provide the following information in a structured format.
+    Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
     ===========================
     ETAILED DEFECT GUIDELINES
     ==========================
@@ -117,19 +116,20 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     - Appears as one or multiple linear cracks (thin or thick lines).
     - Cracks may run vertically, horizontally, or diagonally.
     - Severity increases when cracks are thicker, longer, or branching.
-    - Minor cracks usually appear as slightly darker lines compared to the surrounding concrete, with low color contrast.
-    - Severe or deep cracks appear significantly darker, often nearly black, because the interior receives little to no light.
+    - Minor(urgency: medium) cracks usually appear as slightly darker lines compared to the surrounding concrete, with low color contrast.
+    - Severe or deep cracks(urgency:high) appear significantly darker, often nearly black, because the interior receives little to no light.
     - IMPORTANT: Even if the crack is thin, if it appears consistently dark or black along a long segment, treat it as a deeper or more severe crack. In such cases, assign Medium or High urgency rather than Low.
-    - IMPORTANT: Only the surface is split; no thick concrete chunk is missing.
+    - IMPORTANT: Only the surface is split; missing the thick concrete chunk is Concrete Spalling.
 
     2. Rebar Exposure:
-    - Reinforcing steel bars are visible due to severe concrete loss.
+    - “Exposed rebar” means that reinforcing steel bars, which should be covered by concrete, are visible because the concrete around them has been damaged or lost. This exposes the steel to corrosion and can weaken the structure.
     - Rebar may appear rusty, orange-brown, or metallic.
     - The surrounding concrete is deeply missing.
     - Urgency is Classified as High.
     - IMPORTANT: If any rebar is visible, classify as Rebar Exposure (not Crack or Spalling).
 
     3. Concrete Spalling:
+    - “Concrete spalling” means that parts of the concrete surface have broken off or peeled away. This reduces the concrete cover, can accelerate corrosion, and may weaken the structure or create falling-concrete hazards.
     - Thick concrete pieces have detached, creating a deep, rough, irregular cavity.
     - Much deeper and thicker than paint peeling.
     - Severity increases with depth, width, and size of the missing concrete.
@@ -138,13 +138,13 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
 
     4. Paint Damage:
     - Only the outer paint layer is peeling or flaking.
-     The underlying concrete remains intact.
+    - The underlying concrete remains intact.
     - The removed layer is thin, shallow, and mostly cosmetic.
     - Urgency is Classified as Low.
 
     5. None:
     - If the image does not match ANY of the above defect characteristics, classify as “None”.
-    - Examples of NON-defects: window frames, door frames, panel seams, tile joints, shadows, reflections, dirt, stains.
+    - Examples of NON-defects: window or door
     - Straight lines from structural elements must NOT be considered cracks.
     - If the category is "None", urgency also returns "None"
 
@@ -162,6 +162,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     llava_questions = {
         "이미지에 나타난 손상에 대해 분석 요약해주세요": textwrap.dedent(f"""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
                                                                 Your analysis is NOT a substitute for a professional engineering inspection.
+                                                                Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
                                                                 For context, this damage has been previously classified as:
                                                                 - Defect type: {defect_type}
                                                                 - Preliminary urgency level: {urgency}
@@ -175,13 +176,21 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
                                                                 Replace the bracketed parts with your assessment based on the image.
                                                                 Do not add any extra sentences, lists, or sections outside this pattern.
                                                             """),
-        "어떤 조치가 필요할지 조언해주세요": textwrap.dedent(f"""Based only on the visible appearance of the damage in the image, and the following prior assessment:
+        "어떤 조치가 필요할지 조언해주세요": textwrap.dedent(f"""You should answer as if you were an experienced building inspection assistant who is used to explaining damage and suggesting general maintenance directions.
+                                                        Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
+                                                        For context, this damage has been previously classified as:
                                                         - Defect type: {defect_type}
                                                         - Preliminary urgency level: {urgency}
-                                                        what kind of follow-up actions would you tentatively recommend?
-                                                        For example, you may mention things like closer professional inspection, monitoring over time, or simple surface repair.
-                                                        Answer cautiously in 3-4 sentences, and clearly state that a professional on-site inspection is required before any real repair decision is made.
-                                                    """)
+
+                                                        Your primary goal is to:
+                                                        1) explain, in plain language, what kinds of problems this visible damage might cause if it worsens, and
+                                                        2) suggest one or two reasonable, high-level follow-up actions (for example: closer professional inspection, monitoring over time, simple protective repair, etc.), based on what you can see in the image.
+                                                        Do NOT give detailed engineering design or exact repair methods (such as specific materials, dimensions, or step-by-step construction procedures).
+
+                                                        Avoid generic answers that only say “a professional inspection is needed.”  
+                                                        First, provide concrete but cautious observations and general recommendations.  
+                                                        Only at the end of your answer, add one short sentence noting that a professional on-site inspection is required before any final repair decision.
+                                                        """)
     }
 
     user_text = llava_questions.get(question, question) if question else (prompt_start).strip()
@@ -215,7 +224,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
         return_tensors="pt",
     )
 
-    generate_ids = model.generate(**inputs, max_new_tokens=1500) # max_new_tokens로 답변 길이 조절
+    generate_ids = model.generate(**inputs, max_new_tokens=1700) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     # 결과 출력(프롬프트를 제외한 순수 답변 부분만 추출)
