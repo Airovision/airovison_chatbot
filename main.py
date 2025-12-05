@@ -29,6 +29,7 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     print("----- 데이터베이스 초기화 중 -----")
     await init_db()
+    await delete_old_defects(days=30)
     print(f"✅ 데이터베이스 준비 완료: {settings.DB_PATH.resolve()}")
 
     # LLaVA 모델 로드
