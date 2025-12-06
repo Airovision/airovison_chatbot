@@ -57,7 +57,7 @@ async def create_defect_in_db(defect: DefectOut) -> Optional[DefectOut]:
         async with aiosqlite.connect(settings.DB_PATH) as db:
             await db.execute(sql, (
                 defect.id, defect.latitude, defect.longitude,
-                defect.image, defect.detect_time, defect.address, defect.repair_status
+                defect.image, defect.detect_time, defect.address
             ))
             await db.commit()
         return defect
