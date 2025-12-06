@@ -180,7 +180,7 @@ async def get_records(channel: discord.TextChannel):
     select_view = DefectSelectView(records)
     
     await channel.send(
-        "\n🔧 특정 손상의 **상세 정보 확인/보수 상태 변경**을 원하시면 아래에서 선택하세요.",
+        "🔧 특정 손상의 **상세 정보 확인/보수 상태 변경**을 원하시면 아래에서 선택하세요.",
         view=select_view
     )
 
@@ -230,8 +230,7 @@ class DefectDetailView(View):
         }
         if new_status not in allowed_next.get(current, []):
             await interaction.response.send_message(
-                f"⚠️ 현재 상태가 **{current}**이므로 **{new_status}**(으)로 바로 변경할 수 없습니다.",
-                ephemeral=True
+                f"⚠️ 현재 상태가 **{current}**이므로 **{new_status}**(으)로 바로 변경할 수 없습니다."
             )
             return
 
@@ -243,8 +242,7 @@ class DefectDetailView(View):
         await edit_embed_repair_status(interaction.message, new_status)
 
         await interaction.response.send_message(
-            f"🔧 `{self.defect_id}`의 보수 공사를 **{new_status}** 상태로 변경했습니다!",
-            ephemeral=True
+            f"🔧 선택한 손상의 보수 공사를 **{new_status}** 상태로 변경했습니다!"
         )
 
         if new_status == "완료":
