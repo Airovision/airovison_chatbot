@@ -73,7 +73,7 @@ class DefectSelect(discord.ui.Select):
             return
 
         detail_embed = build_defect_detail_embed(record)
-        view = DefectDetailView(defect_id=defect_id)
+        view = DefectDetailView(record)
 
         await interaction.response.send_message(
             embed=detail_embed,
@@ -166,15 +166,12 @@ async def edit_embed_repair_status(message: discord.Message, new_status: str):
 class DefectDetailView(View):
     def __init__(self, defect_id: str):
         super().__init__(timeout=600)
-        self.defect_id = defect_id
-        asyncio.create_task(self._load_buttons())
+        self.record = record
+        self.defect_id = record.id
+        self._setup_buttons()
 
-    async def _load_buttons(self):
-        record = await get_defect_by_id(self.defect_id)
-        if not record:
-            return
-        
-        status = record.repair_status or "미처리"
+    def _setup_buttons(self):
+        status = self.record.repair_status or "미처리"
 
         if status == "미처리":
             self.add_item(self.MakeInProgressButton())
@@ -214,8 +211,9 @@ class DefectDetailView(View):
             f"🔧 선택한 손상의 보수 공사를 **{new_status}** 상태로 변경했습니다!"
         )
 
-        new_view = DefectDetailView(self.defect_id)
-        await asyncio.sleep(0.1)
+        new_record = await get_defect_by_id(self.defect_id)
+        new_view = DefectDetailView(new_record)
+
         await interaction.message.edit(view=new_view)
 
 
