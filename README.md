@@ -126,7 +126,7 @@ print("Using device:", device)
 - `airobot.py` 파일에서 `CHANNEL_ID`에 원하는 디스코드 채널의 ID 값을 넣어주세요.
 
 #### 2. 📄 Google Calendar API 인증
-- 보수 공사 일정을 Google Calendar에 자동으로 추가하기 위해서는 `credentials.json`과 `token.json` 파일이 필요합니다.  
+- 보수 공사 일정을 Google Calendar에 추가하기 위해서는 `credentials.json`과 `token.json` 파일이 필요합니다.  
   아래 절차에 따라 `credentials.json`을 생성하세요.
   
 	```bash
