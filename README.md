@@ -137,6 +137,10 @@ print("Using device:", device)
   
   ```bash
   # 3) 프로그램 시작
+  # 방법 1
   uvicorn main:app --reload
+
+  # 방법 2
+  python3 main.py
   ```
 
