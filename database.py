@@ -29,7 +29,8 @@ async def init_db():
             detect_time TEXT NOT NULL,
             defect_type TEXT,
             urgency TEXT,
-            address TEXT
+            address TEXT,
+            repair_status TEXT DEFAULT '미처리'
         )
         """)
         await db.commit()
@@ -163,3 +164,13 @@ async def delete_old_defects(days: int = 30):
         print(f"✅ {days}일 이상 지난 손상 기록 삭제 완료")
     except aiosqlite.Error as e:
         print(f"❌ 오래된 데이터 삭제 실패: {e}")
+
+
+# ----- 보수 공사 상태 변경 -----
+async def update_repair_status(defect_id: str, status: str):
+    async with aiosqlite.connect(settings.DB_PATH) as db:
+        await db.execute(
+            "UPDATE defects SET repair_status = ? WHERE id = ?",
+            (status, defect_id)
+        )
+        await db.commit()

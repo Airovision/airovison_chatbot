@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 DefectType = Literal["콘크리트 균열","콘크리트 박리","도장 손상","철근 노출"]
 Urgency = Literal["높음","보통","낮음"]
+Repair_status = Literal["미처리", "진행 중", "완료"]
 
 
 # ----- 생성용(드론 → 서버) -----
@@ -33,3 +34,4 @@ class DefectOut(BaseModel):
     defect_type: Optional[DefectType] = None
     urgency: Optional[Urgency] = None
     address: Optional[str] = None
+    repair_status: Optional[Repair_status] = None
