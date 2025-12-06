@@ -135,7 +135,7 @@ async def run_analysis_and_notify(defect: DefectOut):
             f"🕒 감지 시각: {defect.detect_time}\n" \
             f"🏷️ 손상 유형: {defect_type}\n" \
             f"⚠️ 위험도(점검 긴급성): {urgency}"
-        await send_defect_alert(defect, llava_summary)
+        await send_defect_alert(updated_defect, llava_summary)
 
         return updated_defect
         

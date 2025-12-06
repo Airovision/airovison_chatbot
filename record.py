@@ -263,13 +263,12 @@ class DateInputModal(discord.ui.Modal, title="보수 공사 일정 입력"):
                 
         try:
             description = (
-                f"🆔 **손상 ID:** {self.defect_id}\n"
-                f"📍 **위치:** {self.address}\n"
-                f"🏷️ **손상 유형:** {self.defect_type}\n"
-                f"⚠️ **위험도:** {self.urgency}\n"
-                f"🖼️ **이미지:** {self.image_url}\n"
-                "\n"
-                f"👤 **등록자:** {interaction.user.display_name}\n"
+                f"🆔 {self.defect_id}\n"
+                f"📍 {self.address}\n"
+                f"🏷️ {self.defect_type}\n"
+                f"⚠️ 위험도 {self.urgency}\n"
+                f"🖼️ {self.image_url}\n\n"
+                f"👤 {interaction.user.display_name}\n"
             )
             event_link = add_to_calendar(
                 selected_date.isoformat(),
@@ -290,7 +289,7 @@ class DateInputModal(discord.ui.Modal, title="보수 공사 일정 입력"):
         
         await interaction.response.send_message(
             f"✅ **보수 공사 일정 확정**\n\n"
-            f"{interaction.user.mention}님이 요청하신 보수 공사 일정이 **{selected_date}**에 추가되었습니다.\n"
-            f"해당 손상의 보수 상태가 **진행중**으로 변경되었습니다!"
+            f"{interaction.user.mention}님이 요청하신 보수 공사 일정을 **{selected_date}**에 추가했습니다.\n"
+            f"해당 손상의 보수 상태가 **진행중**으로 변경되었습니다.\n\n"
             f"📅 캘린더에서 보기({event_link})\n\n"            
         )
