@@ -17,10 +17,10 @@
   
   ```json
   {
-		"latitude": 17.3595704,
-		"longitude": 128.105399,
-		"image" : "image url",
-		"detect_time": "2025-11-10 11:40:20"
+		"latitude": 37.4503,
+		"longitude": 126.654,
+		"image" : "image_url.jpg",
+		"detect_time": "2025-11-17 15:22:20"
   }
   
 - response body 예시
