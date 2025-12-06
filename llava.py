@@ -11,7 +11,6 @@ _model = None
 _processor = None
 _device = None
 
-REF_DIR = "./reference_images" # ICL 기법 프롬프트에 들어갈 예시 사진들
 
 # 손상 유형
 defect_type_choice = {
@@ -91,7 +90,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     """
     디스코드 챗봇에서 호출용:
         image_path: 분석할 이미지 파일 경로
-        uestion: 버튼으로 받은 한국어 질문
+        question: 버튼으로 받은 한국어 질문
     """
     
     model, processor, device = load_llava_model()
@@ -103,7 +102,6 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     prompt_start = textwrap.dedent(
     """
     You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
-    Your analysis is NOT a substitute for a professional engineering inspection.
     Analyze the image carefully and provide the following information in a structured format.
     Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
     ===========================
@@ -141,7 +139,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
 
     5. None:
     - If the image does not match ANY of the above defect characteristics, classify as “None”.
-    - Examples of NON-defects: window frames, door frames, panel seams, tile joints, shadows, reflections, dirt, stains.
+    - Examples of NON-defects: window or door
     - Straight lines from structural elements must NOT be considered cracks.
     - If the category is "None", urgency also returns "None"
 
@@ -181,7 +179,6 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
                                                         1) explain, in plain language, what kinds of problems this visible damage might cause if it worsens, and
                                                         2) suggest one or two reasonable, high-level follow-up actions (for example: closer professional inspection, monitoring over time, simple protective repair, etc.), based on what you can see in the image.
                                                         Do give detailed methods.
-
                                                         Avoid generic answers that only say “a professional inspection is needed.”  
                                                         First, provide concrete but cautious observations and general recommendations.  
                                                         Only at the end of your answer, add one short sentence noting that a professional on-site inspection is required before any final repair decision.
@@ -220,7 +217,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
         return_tensors="pt",
     ).to(device)
 
-    generate_ids = model.generate(**inputs, max_new_tokens=1500) # max_new_tokens로 답변 길이 조절
+    generate_ids = model.generate(**inputs, max_new_tokens=2000) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
     # 결과 출력(프롬프트를 제외한 순수 답변 부분만 추출)

@@ -66,19 +66,24 @@ async def get_records(channel: discord.TextChannel):
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 def get_calendar_service():
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            ccreds = flow.run_console()
-        with open('token.json', 'w') as token:
+    if not os.path.exists("token.json"):
+        raise RuntimeError("❌ token.json 파일이 없습니다.")
+    
+    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+
+        with open("token.json", "w") as token:
             token.write(creds.to_json())
+
+    elif not creds or not creds.valid:
+        raise RuntimeError("❌ token.json이 유효하지 않습니다.")
+
     return build('calendar', 'v3', credentials=creds)
 
+
+# ----- 보수 공사 일정 추가 기능 -----
 def add_to_calendar(date: str, summary: str, description: str):
     service = get_calendar_service()
     event = {
@@ -88,10 +93,9 @@ def add_to_calendar(date: str, summary: str, description: str):
         'end': {'date': date, 'timeZone': 'Asia/Seoul'}
     }
     created_event = service.events().insert(calendarId='primary', body=event).execute()
+
     return created_event.get('htmlLink')
 
-
-# ----- 보수 공사 일정 추가 기능 -----
 class DateInputModal(discord.ui.Modal, title="보수 공사 일정 입력"):
     date = discord.ui.TextInput(
         label="날짜 (YYYY-MM-DD)",
@@ -107,7 +111,6 @@ class DateInputModal(discord.ui.Modal, title="보수 공사 일정 입력"):
                 f"❌ 잘못된 날짜 형식입니다. YYYY-MM-DD 형식으로 입력해주세요.",
                 ephemeral=True
             )
-            return
         
         try:            
             event_link = add_to_calendar(
