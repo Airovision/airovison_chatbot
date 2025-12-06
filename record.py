@@ -164,7 +164,7 @@ async def edit_embed_repair_status(message: discord.Message, new_status: str):
 
 
 class DefectDetailView(View):
-    def __init__(self, defect_id: str):
+    def __init__(self, record: DefectOut):
         super().__init__(timeout=600)
         self.record = record
         self.defect_id = record.id
@@ -208,7 +208,7 @@ class DefectDetailView(View):
         await edit_embed_repair_status(interaction.message, new_status)
 
         await interaction.followup.send(
-            f"🔧 선택한 손상의 보수 공사를 **{new_status}** 상태로 변경했습니다!"
+            f"✅ 선택한 손상의 보수 공사를 **{new_status}** 상태로 변경했습니다!"
         )
 
         new_record = await get_defect_by_id(self.defect_id)
