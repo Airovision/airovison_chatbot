@@ -134,7 +134,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     - Severe or deep cracks appear significantly darker, often nearly black, because the interior receives little to no light.
     - IMPORTANT: Even if the crack is thin, if it appears consistently dark or black along a long segment, treat it as a deeper or more severe crack. In such cases, assign Medium or High urgency rather than Low.
     - When rating the crack severity (Low / Medium / High), do not automatically choose Medium. 
-    - Prefer to reserve Low or High (whenever the image supports a lower or higher severity) rather than Medium.
+    - Prefer to reserve Low or High rather than Medium.
     - reserve Medium only for genuinely unclear or borderline cases.
 
     5. None:
@@ -157,17 +157,22 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     llava_questions = {
         "이미지에 나타난 손상에 대해 분석 요약해주세요": textwrap.dedent(f"""You are an AI assistant analyzing a potential building defect from a drone image for a preliminary assessment.
                                                                 Your analysis is NOT a substitute for a professional engineering inspection.
+
                                                                 Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
+
                                                                 For context, this damage has been previously classified as:
                                                                 - Defect type: {defect_type}
                                                                 - Preliminary urgency level: {urgency}
                                                                 You may use this information as a soft hint, but base your description primarily on what you can see in the image itself.
 
-                                                                Follow this pattern as closely as possible:
-                                                                "The damage in the image appears as [brief visual description of the damage: shape, size, location, and visible texture/color differences]. Based on this appearance, it could cause [potential issues or risks], and the urgency of repair appears to be [how urgent the repair seems, e.g., not very urgent / advisable in the near future / quite urgent]."
+                                                                Your answer MUST:
+                                                                - Please answer in 4–5 full sentences with a detailed explanation, in a natural conversational tone.
+                                                                - Give a very concrete visual description of the defect: its exact location inside the box (e.g., near the top edge, along a joint, at a corner), its shape (line, patch, spot, network of cracks, etc.), its approximate size relative to nearby elements (e.g., compared to bricks, tiles, or panel width), and its color/texture compared to the surrounding surface (e.g., darker, rougher, exposed rebar, peeled paint).
+                                                                - Describe how the damage relates to nearby structural features such as joints, edges, corners, beams, columns, window frames, or reinforcement bars if they are visible.
+                                                                - Then explain what kinds of problems this damage might lead to (e.g., water penetration, corrosion of reinforcement, spalling, loss of protective cover, safety risk, aesthetic issue).
 
-                                                                Replace the bracketed parts with your assessment based on the image.
-                                                                Please answer in 4–5 full sentences with a detailed explanation, in a natural conversational tone.
+                                                                Follow this pattern as closely as possible:
+                                                                "The damage in the image appears as [detailed visual description of the damage: exact position inside the box, shape, approximate size, and visible texture/color differences compared to the surrounding area]. It is located [describe its position relative to edges, corners, joints, or structural members]. Based on this appearance, it could cause [specific potential issues or risks]. These issues are more or less likely because [brief reasoning using visible clues such as crack width, length, depth, exposed rebar, staining, or repeated patterns]."                                                      
                                                             """),
         "어떤 조치가 필요할지 조언해주세요": textwrap.dedent(f"""You should answer as if you were an experienced building inspection assistant who is used to explaining damage and suggesting general maintenance directions.
                                                         Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
