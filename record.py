@@ -55,7 +55,8 @@ class DefectSelect(discord.ui.Select):
         for r in records:
             short_loc = (r.address or f"{r.latitude:.4f}, {r.longitude:.4f}")[:45]
             label = f"{short_loc}"
-            desc = f"{r.detect_time} | {r.defect_type or '분석 중'} | {r.urgency or '분석 중'}"
+            repair = r.repair_status or "미처리"
+            desc = f"{r.detect_time} | {r.defect_type or '분석 중'} | {r.urgency or '분석 중'} | {repair}"
             options.append(SelectOption(label=label, description=desc[:100], value=r.id))
 
         super().__init__(
@@ -237,6 +238,14 @@ def add_to_calendar(date: str, summary: str, description: str):
     return created_event.get('htmlLink')
 
 class DateInputModal(discord.ui.Modal, title="보수 공사 일정 입력"):
+    def __init__(self, defect_id: str, image_url: str, defect_type: str, urgency: str, address: str):
+        super().__init__(timeout=None)
+        self.defect_id = defect_id
+        self.image_url = image_url
+        self.defect_type = defect_type
+        self.urgency = urgency
+        self.address = address
+
     date = discord.ui.TextInput(
         label="날짜 (YYYY-MM-DD)",
         placeholder="예: 2025-12-15",
@@ -251,18 +260,37 @@ class DateInputModal(discord.ui.Modal, title="보수 공사 일정 입력"):
                 f"❌ 잘못된 날짜 형식입니다. YYYY-MM-DD 형식으로 입력해주세요.",
                 ephemeral=True
             )
-        
-        try:            
-            event_link = add_to_calendar(
-                selected_date.isoformat(), 
-                "건물 외벽 보수 공사", 
-                f"{interaction.user.display_name}님 요청"
+                
+        try:
+            description = (
+                f"🆔 **손상 ID:** {self.defect_id}\n"
+                f"📍 **위치:** {self.address}\n"
+                f"🏷️ **손상 유형:** {self.defect_type}\n"
+                f"⚠️ **위험도:** {self.urgency}\n"
+                f"🖼️ **이미지:** {self.image_url}\n"
+                "\n"
+                f"👤 **등록자:** {interaction.user.display_name}\n"
             )
-
-            await interaction.response.send_message(
-                f"✅ **보수 공사 일정 확정**\n\n"
-                f"{interaction.user.mention}님이 요청하신 보수 공사 일정이 **{selected_date}**에 추가되었습니다.\n"
-                f"📅 캘린더에서 보기({event_link})"
+            event_link = add_to_calendar(
+                selected_date.isoformat(),
+                f"건물 외벽 보수 공사",
+                description
             )
         except Exception as e:
             await interaction.response.send_message(f"❌ 캘린더 등록 실패: {e}", ephemeral=True)
+            return
+
+        updated = await update_repair_status(self.defect_id, "진행중")
+        if not updated:
+            await interaction.response.send_message(
+                "⚠️ 일정은 등록됐지만 보수 상태 업데이트는 실패했습니다.",
+                ephemeral=True
+            )
+            return
+        
+        await interaction.response.send_message(
+            f"✅ **보수 공사 일정 확정**\n\n"
+            f"{interaction.user.mention}님이 요청하신 보수 공사 일정이 **{selected_date}**에 추가되었습니다.\n"
+            f"해당 손상의 보수 상태가 **진행중**으로 변경되었습니다!"
+            f"📅 캘린더에서 보기({event_link})\n\n"            
+        )

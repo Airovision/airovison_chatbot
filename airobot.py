@@ -61,7 +61,7 @@ class QuestionView(View):
 
     # Q2 버튼 - "어떤 조치가 필요할지 조언해주세요"
     @discord.ui.button(label=questions[2], style=discord.ButtonStyle.primary)
-    async def q3(self, interaction: discord.Interaction, button: Button):
+    async def q2(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
 
         await interaction.response.defer(thinking=True)
@@ -73,7 +73,7 @@ class QuestionView(View):
 
     # Q3 - "모든 손상 기록을 조회할게요"
     @discord.ui.button(label=questions[3], style=discord.ButtonStyle.secondary)
-    async def q4(self, interaction: discord.Interaction, button: Button):
+    async def q3(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
         
         await interaction.response.defer(thinking=True)
@@ -84,10 +84,16 @@ class QuestionView(View):
 
     # Q4 - "캘린더에 보수 공사 일정을 추가할게요"
     @discord.ui.button(label=questions[4], style=discord.ButtonStyle.secondary)
-    async def q5(self, interaction: discord.Interaction, button: Button):
+    async def q4(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
 
-        await interaction.response.send_modal(DateInputModal())
+        await interaction.response.send_modal(DateInputModal(
+            defect_id=self.defect_id,
+            image_url=self.image_url,
+            defect_type=self.defect_type,
+            urgency=self.urgency,
+            address = self.address
+        ))
 
 
 # ----- FastAPI가 호출할 알림 함수 -----
