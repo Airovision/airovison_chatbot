@@ -124,8 +124,7 @@ class DefectSelect(discord.ui.Select):
 
         await interaction.response.send_message(
             embed=detail_embed,
-            view=view,
-            ephemeral=True
+            view=view
         )
 
 
