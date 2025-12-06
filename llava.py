@@ -59,8 +59,8 @@ def load_llava_model():
         revision=revision,
         quantization_config=quantization_config,
         torch_dtype=torch.float16,
-        #device_map="auto"
-    ).to(_device)
+        device_map="auto"
+    )
 
     try:
         _processor = AutoProcessor.from_pretrained(model_id, revision=revision)
@@ -215,7 +215,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
         text=prompt_for_model,
         images=image,
         return_tensors="pt",
-    ).to(device)
+    )
 
     generate_ids = model.generate(**inputs, max_new_tokens=2000) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
