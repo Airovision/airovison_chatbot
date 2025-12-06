@@ -59,8 +59,8 @@ def load_llava_model():
         revision=revision,
         quantization_config=quantization_config,
         torch_dtype=torch.float16,
-        device_map="auto"
-    )
+        #device_map="auto"
+    ).to(_device)
 
     try:
         _processor = AutoProcessor.from_pretrained(model_id, revision=revision)
@@ -112,37 +112,30 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     [Concrete Crack, Concrete Spalling, Paint Damage, Rebar Exposure, None]
     Use the following definitions and visual criteria strictly:
 
-    1. Concrete Crack:
-    - Appears as one or multiple linear cracks (thin or thick lines).
-    - Cracks may run vertically, horizontally, or diagonally.
-    - Severity increases when cracks are thicker, longer, or branching.
-    - Minor(urgency: medium) cracks usually appear as slightly darker lines compared to the surrounding concrete, with low color contrast.
-    - Severe or deep cracks(urgency:high) appear significantly darker, often nearly black, because the interior receives little to no light.
-    - IMPORTANT: Even if the crack is thin, if it appears consistently dark or black along a long segment, treat it as a deeper or more severe crack. In such cases, assign Medium or High urgency rather than Low.
-    - IMPORTANT: Only the surface is split; missing the thick concrete chunk is Concrete Spalling.
-    - When rating the severity (Low / Medium / High), avoid being overly conservative. Do not automatically choose Medium; use Low or High when the visible evidence clearly supports it.
-
-
-    2. Rebar Exposure:
-    - “Exposed rebar” means that reinforcing steel bars, which should be covered by concrete, are visible because the concrete around them has been damaged or lost. This exposes the steel to corrosion and can weaken the structure.
+    1. Rebar Exposure:
+    - Reinforcing steel bars are visible due to severe concrete loss.
     - Rebar may appear rusty, orange-brown, or metallic.
     - The surrounding concrete is deeply missing.
     - Urgency is Classified as High.
     - IMPORTANT: If any rebar is visible, classify as Rebar Exposure (not Crack or Spalling).
+    - If reinforcing steel bars (rebar) are visibly exposed, always prioritize "exposed rebar" as the main damage type instead of just calling it a crack. 
+    - Do not describe such cases only as cracking; you should explicitly mention that the rebar is exposed.
 
-    3. Concrete Spalling:
-    - “Concrete spalling” means that parts of the concrete surface have broken off or peeled away. This reduces the concrete cover, can accelerate corrosion, and may weaken the structure or create falling-concrete hazards.
-    - Thick concrete pieces have detached, creating a deep, rough, irregular cavity.
-    - Much deeper and thicker than paint peeling.
-    - Severity increases with depth, width, and size of the missing concrete.
-    - Urgency is classified as High or Medium (depends on depth, width, and size)
-    - IMPORTANT: If rebar is visible, classify as Rebar Exposure instead.
-
-    4. Paint Damage:
-    - Only the outer paint layer is peeling or flaking.
+    2. Paint Damage:
+    - Only the outer paint layer is "peeling or flaking".
     - The underlying concrete remains intact.
     - The removed layer is thin, shallow, and mostly cosmetic.
     - Urgency is Classified as Low.
+
+    3. Concrete Crack:
+    - Appears as one or multiple linear cracks (thin or thick lines).
+    - Cracks may run vertically, horizontally, or diagonally.
+    - Minor cracks usually appear as slightly darker lines compared to the surrounding concrete, with low color contrast.
+    - Severe or deep cracks appear significantly darker, often nearly black, because the interior receives little to no light.
+    - IMPORTANT: Even if the crack is thin, if it appears consistently dark or black along a long segment, treat it as a deeper or more severe crack. In such cases, assign Medium or High urgency rather than Low.
+    - When rating the crack severity (Low / Medium / High), do not automatically choose Medium. 
+    - Prefer to reserve Low or High (whenever the image supports a lower or higher severity) rather than Medium.
+    - reserve Medium only for genuinely unclear or borderline cases.
 
     5. None:
     - If the image does not match ANY of the above defect characteristics, classify as “None”.
@@ -170,14 +163,11 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
                                                                 - Preliminary urgency level: {urgency}
                                                                 You may use this information as a soft hint, but base your description primarily on what you can see in the image itself.
 
-                                                                Provide a concise but informative description in 3–4 sentences, in a natural conversational tone.
                                                                 Follow this pattern as closely as possible:
-
                                                                 "The damage in the image appears as [brief visual description of the damage: shape, size, location, and visible texture/color differences]. Based on this appearance, it could cause [potential issues or risks], and the urgency of repair appears to be [how urgent the repair seems, e.g., not very urgent / advisable in the near future / quite urgent]."
 
                                                                 Replace the bracketed parts with your assessment based on the image.
-                                                                Do not add any extra sentences, lists, or sections outside this pattern.
-                                                                Please answer in 4–5 full sentences with a detailed explanation.
+                                                                Please answer in 4–5 full sentences with a detailed explanation, in a natural conversational tone.
                                                             """),
         "어떤 조치가 필요할지 조언해주세요": textwrap.dedent(f"""You should answer as if you were an experienced building inspection assistant who is used to explaining damage and suggesting general maintenance directions.
                                                         Focus your attention on the area inside the red bounding box, as that region contains the suspected damage.
@@ -188,8 +178,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
                                                         Your primary goal is to:
                                                         1) explain, in plain language, what kinds of problems this visible damage might cause if it worsens, and
                                                         2) suggest one or two reasonable, high-level follow-up actions (for example: closer professional inspection, monitoring over time, simple protective repair, etc.), based on what you can see in the image.
-                                                        Do NOT give detailed engineering design or exact repair methods (such as specific materials, dimensions, or step-by-step construction procedures).
-
+                                                        Do give detailed methods.
                                                         Avoid generic answers that only say “a professional inspection is needed.”  
                                                         First, provide concrete but cautious observations and general recommendations.  
                                                         Only at the end of your answer, add one short sentence noting that a professional on-site inspection is required before any final repair decision.
@@ -226,7 +215,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
         text=prompt_for_model,
         images=image,
         return_tensors="pt",
-    )
+    ).to(device)
 
     generate_ids = model.generate(**inputs, max_new_tokens=2000) # max_new_tokens로 답변 길이 조절
     english_result_full = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
