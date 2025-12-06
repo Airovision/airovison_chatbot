@@ -195,11 +195,6 @@ class DefectDetailView(View):
             await view._change_status(interaction, "완료")
 
     async def _change_status(self, interaction: discord.Interaction, new_status: str):
-        record = await get_defect_by_id(self.defect_id)
-        if not record:
-            await interaction.response.send_message("❌ 손상 기록 조회 실패", ephemeral=True)
-            return
-
         updated = await update_repair_status(self.defect_id, new_status)
         if not updated:
             await interaction.response.send_message("❌ 상태 업데이트 실패", ephemeral=True)
@@ -207,14 +202,14 @@ class DefectDetailView(View):
 
         await edit_embed_repair_status(interaction.message, new_status)
 
-        await interaction.followup.send(
-            f"✅ 선택한 손상의 보수 공사를 **{new_status}** 상태로 변경했습니다!"
-        )
-
         new_record = await get_defect_by_id(self.defect_id)
         new_view = DefectDetailView(new_record)
 
-        await interaction.message.edit(view=new_view)
+        await interaction.response.edit_message(view=new_view)
+
+        await interaction.followup.send(
+            f"✅ 선택한 손상의 보수 공사를 **{new_status}** 상태로 변경했습니다!"
+        )
 
 
 # ----- Google Calendar API 설정 -----
