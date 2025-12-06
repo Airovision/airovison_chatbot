@@ -173,18 +173,8 @@ class DefectDetailView(View):
     def _setup_buttons(self):
         status = self.record.repair_status or "미처리"
 
-        if status == "미처리":
-            self.add_item(self.MakeInProgressButton())
-        elif status == "진행중":
+        if status in ["미처리", "진행중"]:
             self.add_item(self.MakeDoneButton())
-
-    class MakeInProgressButton(discord.ui.Button):
-        def __init__(self):
-            super().__init__(label="보수 공사를 진행할게요", style=discord.ButtonStyle.primary)
-
-        async def callback(self, interaction: discord.Interaction):
-            view: DefectDetailView = self.view
-            await view._change_status(interaction, "진행중")
 
     class MakeDoneButton(discord.ui.Button):
         def __init__(self):
