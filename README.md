@@ -61,6 +61,31 @@
 - LLaVA 서버 연동 (멀티모달 분석)
 - 기타 의존성: `requirements.txt` 참고
 
+## 💻 GPU 환경 (CUDA / MPS 지원)
+
+이 프로젝트에서 사용하는 PyTorch 기반 모델은 **GPU 가속**을 지원하며, 아래 두 가지 환경을 모두 사용할 수 있습니다.
+
+- **CUDA (NVIDIA GPU)**  
+  - Linux / Windows 환경에서 NVIDIA GPU와 CUDA 드라이버가 설치되어 있으면 자동으로 `cuda` 디바이스를 사용합니다.
+- **MPS (Apple Silicon / Metal Performance Shaders)**  
+  - macOS에서 Apple Silicon(M1/M2/M3) 및 최신 PyTorch 버전을 사용할 경우 `mps` 디바이스를 통해 GPU 가속을 사용할 수 있습니다.
+
+디바이스 선택 코드는 다음과 같이 구성을 확인할 수 있습니다.
+
+```python
+## llava.py
+import torch
+
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
+print("Using device:", device)
+```
+- GPU가 없는 환경에서는 자동으로 CPU 모드로 동작합니다.
 
 ## 📂 파일 / 디렉토리 구조
 
@@ -81,7 +106,7 @@
   └── .gitignore        # Git 버전관리 제외 파일 설정
   ```
 ---
-## 🖥️ 실행하기
+## 📍 실행하기
 #### 1. ⚙️ 환경 변수 설정
 - 프로그램을 실행하기 전에 프로젝트 루트에 `.env` 파일을 먼저 생성해야 합니다.  
   아래 형식으로 값을 채워 넣어 주세요.
