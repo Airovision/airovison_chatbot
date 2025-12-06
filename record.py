@@ -17,53 +17,6 @@ from typing import List
 
 
 # ----- DB 연동 손상 기록 조회 -----
-# async def get_records(channel: discord.TextChannel):
-#     try:
-#         records: List[DefectOut] = await get_all_defects_from_db(sort_by_urgency=True)
-#     except Exception as e:
-#         await channel.send(f"❌ DB 조회 중 오류가 발생했습니다: {e}")
-#         return
-        
-#     if not records:
-#         await channel.send("ℹ️ DB에 저장된 손상 기록이 없습니다.")
-#         return
-
-#     await channel.send("📈 **보수 공사가 시급한 순으로 모든 손상 기록을 조회했어요\n**")
-
-#     for record in records:        
-#         risk = record.urgency or "분석 중"
-#         repair = record.repair_status or "미처리"
-        
-#         color = discord.Color.red() if risk == "높음" \
-#                 else discord.Color.yellow() if risk == "보통" \
-#                 else discord.Color.green() if risk == "낮음" \
-#                 else discord.Color.greyple() # 분석 중일 때
-
-#         location = record.address or f"좌표: {record.latitude}, {record.longitude}"
-        
-#         image_url = record.image
-#         print(f"image url = {image_url}")
-#         if image_url and image_url.startswith("/data"):
-#             image_url = f"http://34.218.88.107:8000{image_url}"
-
-#         embed = discord.Embed(
-#             title=f"🆔 {record.id}",
-#             description=(      
-#                 f"📍 **위치 :** {location}\n"          
-#                 f"🕒 **감지 시각 :** {record.detect_time}\n"
-#                 f"🏷️ **손상 유형 :** {record.defect_type or '분석 중'}\n" 
-#                 f"⚠️ **위험도 :** {risk}\n"
-#                 f"🛠️ **보수 상태** : {record.repair_status or '미처리'}\n"
-#             ),
-#             color=color
-#         )
-                
-#         print(f"after image url : {image_url}")
-#         if image_url and (image_url.startswith("http://") or image_url.startswith("https://")):
-#             embed.set_image(url=image_url)
-            
-#         await channel.send(embed=embed)
-
 def build_defect_detail_embed(record: DefectOut) -> discord.Embed:
     risk = record.urgency or "분석 중"
     repair = record.repair_status or "미처리"
@@ -214,49 +167,56 @@ class DefectDetailView(View):
     def __init__(self, defect_id: str):
         super().__init__(timeout=600)
         self.defect_id = defect_id
+        asyncio.create_task(self._load_buttons())
+
+    async def _load_buttons(self):
+        record = await get_defect_by_id(self.defect_id)
+        if not record:
+            return
+        
+        status = record.repair_status or "미처리"
+
+        if status == "미처리":
+            self.add_item(self.MakeInProgressButton())
+        elif status == "진행중":
+            self.add_item(self.MakeDoneButton())
+
+    class MakeInProgressButton(discord.ui.Button):
+        def __init__(self):
+            super().__init__(label="보수 공사를 진행할게요", style=discord.ButtonStyle.primary)
+
+        async def callback(self, interaction: discord.Interaction):
+            view: DefectDetailView = self.view
+            await view._change_status(interaction, "진행중")
+
+    class MakeDoneButton(discord.ui.Button):
+        def __init__(self):
+            super().__init__(label="보수 공사를 완료했어요", style=discord.ButtonStyle.success)
+
+        async def callback(self, interaction: discord.Interaction):
+            view: DefectDetailView = self.view
+            await view._change_status(interaction, "완료")
 
     async def _change_status(self, interaction: discord.Interaction, new_status: str):
         record = await get_defect_by_id(self.defect_id)
         if not record:
-            await interaction.response.send_message("❌ 손상 기록 조회 실패")
-            return
-
-        current = record.repair_status or "미처리"
-
-        allowed_next = {
-            "미처리": ["진행중"],
-            "진행중": ["완료"],
-            "완료": []
-        }
-        if new_status not in allowed_next.get(current, []):
-            await interaction.response.send_message(
-                f"⚠️ 현재 상태가 **{current}**이므로 **{new_status}**(으)로 바로 변경할 수 없습니다."
-            )
+            await interaction.response.send_message("❌ 손상 기록 조회 실패", ephemeral=True)
             return
 
         updated = await update_repair_status(self.defect_id, new_status)
         if not updated:
-            await interaction.response.send_message("❌ 상태 업데이트 실패")
+            await interaction.response.send_message("❌ 상태 업데이트 실패", ephemeral=True)
             return
 
         await edit_embed_repair_status(interaction.message, new_status)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"🔧 선택한 손상의 보수 공사를 **{new_status}** 상태로 변경했습니다!"
         )
 
-        if new_status == "완료":
-            for child in self.children:
-                child.disabled = True
-            await interaction.message.edit(view=self)
-
-    @discord.ui.button(label="진행중으로 변경", style=discord.ButtonStyle.primary)
-    async def to_in_progress(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._change_status(interaction, "진행중")
-
-    @discord.ui.button(label="완료로 변경", style=discord.ButtonStyle.success)
-    async def to_done(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._change_status(interaction, "완료")
+        new_view = DefectDetailView(self.defect_id)
+        await asyncio.sleep(0.1)
+        await interaction.message.edit(view=new_view)
 
 
 # ----- Google Calendar API 설정 -----
