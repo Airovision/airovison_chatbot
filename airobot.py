@@ -39,12 +39,13 @@ questions = {
 
 # ----- 버튼 UI 정의 -----
 class QuestionView(View):
-    def __init__(self, image_url: str, defect_id: str, defect_type: str, urgency: str):
+    def __init__(self, image_url: str, defect_id: str, defect_type: str, urgency: str, address: str):
         super().__init__(timeout=None)
         self.image_url = image_url
         self.defect_id = defect_id
         self.defect_type = defect_type
         self.urgency = urgency
+        self.address = address
 
     # Q1 버튼 - "이미지에 나타난 손상에 대해 분석 요약해주세요"
     @discord.ui.button(label=questions[1], style=discord.ButtonStyle.primary)
@@ -132,7 +133,7 @@ async def send_defect_alert(defect: DefectOut, llava_summary: str):
             discord_file = discord.File(image_path, filename=os.path.basename(image_path))
             view_image_url = image_path
 
-        view = QuestionView(image_url=view_image_url, defect_id=defect.id, defect_type=defect.defect_type, urgency=defect.urgency)
+        view = QuestionView(image_url=view_image_url, defect_id=defect.id, defect_type=defect.defect_type, urgency=defect.urgency, address=defect.address)
         
         await channel.send(content=llava_summary, file=discord_file, view=view)
         print(f"✅ Discord 알림 전송 완료 (ID: {defect.id})")
