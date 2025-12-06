@@ -120,7 +120,6 @@ async def run_analysis_and_notify(defect: DefectOut):
     try:
         defect_type,  urgency = await asyncio.to_thread(run_llava, defect.image, None, None, None, None)
         
-        # DB 업데이트
         patch_data = DefectPatch(defect_type=defect_type, urgency=urgency)
         updated_defect = await patch_defect_in_db(defect.id, patch_data)
 
