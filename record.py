@@ -11,12 +11,137 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
-from database import get_all_defects_from_db, update_repair_status
+from database import get_all_defects_from_db, get_defect_by_id
 from models import DefectOut
 from typing import List
 
 
 # ----- DB 연동 손상 기록 조회 -----
+# async def get_records(channel: discord.TextChannel):
+#     try:
+#         records: List[DefectOut] = await get_all_defects_from_db(sort_by_urgency=True)
+#     except Exception as e:
+#         await channel.send(f"❌ DB 조회 중 오류가 발생했습니다: {e}")
+#         return
+        
+#     if not records:
+#         await channel.send("ℹ️ DB에 저장된 손상 기록이 없습니다.")
+#         return
+
+#     await channel.send("📈 **보수 공사가 시급한 순으로 모든 손상 기록을 조회했어요\n**")
+
+#     for record in records:        
+#         risk = record.urgency or "분석 중"
+#         repair = record.repair_status or "미처리"
+        
+#         color = discord.Color.red() if risk == "높음" \
+#                 else discord.Color.yellow() if risk == "보통" \
+#                 else discord.Color.green() if risk == "낮음" \
+#                 else discord.Color.greyple() # 분석 중일 때
+
+#         location = record.address or f"좌표: {record.latitude}, {record.longitude}"
+        
+#         image_url = record.image
+#         print(f"image url = {image_url}")
+#         if image_url and image_url.startswith("/data"):
+#             image_url = f"http://34.218.88.107:8000{image_url}"
+
+#         embed = discord.Embed(
+#             title=f"🆔 {record.id}",
+#             description=(      
+#                 f"📍 **위치 :** {location}\n"          
+#                 f"🕒 **감지 시각 :** {record.detect_time}\n"
+#                 f"🏷️ **손상 유형 :** {record.defect_type or '분석 중'}\n" 
+#                 f"⚠️ **위험도 :** {risk}\n"
+#                 f"🛠️ **보수 상태** : {record.repair_status or '미처리'}\n"
+#             ),
+#             color=color
+#         )
+                
+#         print(f"after image url : {image_url}")
+#         if image_url and (image_url.startswith("http://") or image_url.startswith("https://")):
+#             embed.set_image(url=image_url)
+            
+#         await channel.send(embed=embed)
+
+def build_defect_detail_embed(record: DefectOut) -> discord.Embed:
+    risk = record.urgency or "분석 중"
+    repair = record.repair_status or "미처리"
+
+    color = discord.Color.red() if risk == "높음" \
+            else discord.Color.yellow() if risk == "보통" \
+            else discord.Color.green() if risk == "낮음" \
+            else discord.Color.greyple()
+
+    location = record.address or f"좌표: {record.latitude}, {record.longitude}"
+
+    embed = discord.Embed(
+        title=f"🔍 손상 상세 보기 — {location}",
+        description=(
+            f"🆔 **ID :** `{record.id}`\n"
+            f"🕒 **감지 시각 :** {record.detect_time}\n"
+            f"🏷️ **손상 유형 :** {record.defect_type or '분석 중'}\n"
+            f"⚠️ **위험도 :** {risk}\n"
+            f"🔧 **보수 상태 :** {repair}\n"
+        ),
+        color=color
+    )
+
+    image_url = record.image
+    if image_url and image_url.startswith("/data"):
+        image_url = f"http://34.218.88.107:8000{image_url}"
+    if image_url and (image_url.startswith("http://") or image_url.startswith("https://")):
+        embed.set_image(url=image_url)
+
+    return embed
+
+
+from database import get_all_defects_from_db, get_defect_by_id
+from typing import List
+from discord.ui import View, Select
+from discord import SelectOption
+...
+
+class DefectSelect(discord.ui.Select):
+    def __init__(self, records: List[DefectOut]):
+        options = []
+        for r in records:
+            short_loc = (r.address or f"{r.latitude:.4f}, {r.longitude:.4f}")[:45]
+            label = f"{short_loc}"
+            desc = f"{r.detect_time} | {r.defect_type or '분석 중'} | {r.urgency or '분석 중'}"
+            options.append(SelectOption(label=label, description=desc[:100], value=r.id))
+
+        super().__init__(
+            placeholder="상세 보기 / 보수 상태를 변경할 손상을 선택하세요",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        defect_id = self.values[0]
+        record = await get_defect_by_id(defect_id)
+        if not record:
+            await interaction.response.send_message("❌ 선택한 손상 기록을 찾을 수 없습니다.", ephemeral=True)
+            return
+
+        detail_embed = build_defect_detail_embed(record)
+        view = DefectDetailView(defect_id=defect_id)
+
+        # ✔️ 상세 보기 카드는 버튼과 함께 한 메시지에
+        await interaction.response.send_message(
+            embed=detail_embed,
+            view=view,
+            ephemeral=True  # 채널 안 어지럽히기 싫으면 이렇게, 아니면 False
+        )
+
+
+class DefectSelectView(View):
+    def __init__(self, records: List[DefectOut]):
+        super().__init__(timeout=600)
+        self.add_item(DefectSelect(records))
+
+
 async def get_records(channel: discord.TextChannel):
     try:
         records: List[DefectOut] = await get_all_defects_from_db(sort_by_urgency=True)
@@ -28,94 +153,125 @@ async def get_records(channel: discord.TextChannel):
         await channel.send("ℹ️ DB에 저장된 손상 기록이 없습니다.")
         return
 
-    await channel.send("📈 **보수 공사가 시급한 순으로 모든 손상 기록을 조회했어요\n**")
+    await channel.send("📈 **보수 공사가 시급한 순으로 모든 손상 기록을 조회했어요**")
 
-    for record in records:        
+    # 1) 기존처럼 리스트 Embed 쭉 뿌리기
+    for record in records:
         risk = record.urgency or "분석 중"
-        
         color = discord.Color.red() if risk == "높음" \
                 else discord.Color.yellow() if risk == "보통" \
                 else discord.Color.green() if risk == "낮음" \
-                else discord.Color.greyple() # 분석 중일 때
+                else discord.Color.greyple()
 
         location = record.address or f"좌표: {record.latitude}, {record.longitude}"
-        
         image_url = record.image
-        print(f"image url = {image_url}")
         if image_url and image_url.startswith("/data"):
             image_url = f"http://34.218.88.107:8000{image_url}"
 
+        repair = record.repair_status or "미처리"
+
         embed = discord.Embed(
             title=f"📍 {location}",
-            description=(                
+            description=(
                 f"🕒 **감지 시각 :** {record.detect_time}\n"
                 f"🏷️ **손상 유형 :** {record.defect_type or '분석 중'}\n" 
                 f"⚠️ **위험도 :** {risk}\n"
-                f"🛠️ **보수 상태** : {record.repair_status or '미처리'}\n"
+                f"🔧 **보수 상태 :** {repair}\n"
             ),
             color=color
         )
-        
-        view = RepairStatusButton(
-            defect_id=record.id,
-            current_status=record.repair_status or "미처리"
-        )  
-        
-        print(f"after image url : {image_url}")
         if image_url and (image_url.startswith("http://") or image_url.startswith("https://")):
             embed.set_image(url=image_url)
             
-        await channel.send(embed=embed, view=view)
+        await channel.send(embed=embed)
+
+    # 2) 마지막에 "상세 보기 / 상태 변경"용 Select 뷰 추가 전송
+    select_view = DefectSelectView(records)
+    await channel.send(
+        "🔧 특정 손상의 **상세 정보 확인/보수 상태 변경**을 원하시면 아래에서 선택하세요.",
+        view=select_view
+    )
 
 
 async def edit_embed_repair_status(message: discord.Message, new_status: str):
+    """
+    주어진 메시지의 첫 번째 Embed에서
+    '🔧 보수 상태 :' 라인이 포함된 부분을 new_status로 교체하고, 메시지를 수정.
+    """
     if not message.embeds:
         return
 
-    old_embed = message.embeds[0]
-    new_embed = old_embed.copy()
+    embed = message.embeds[0]
+    new_embed = embed.copy()
 
-    new_description = ""
-    for line in old_embed.description.split("\n"):
+    # description에서 보수 상태 라인만 치환
+    desc = new_embed.description or ""
+    lines = desc.splitlines()
+    for i, line in enumerate(lines):
         if "보수 상태" in line:
-            new_description += f"🛠️ **보수 상태 :** {new_status}\n"
-        else:
-            new_description += line + "\n"
+            lines[i] = f"🔧 **보수 상태 :** {new_status}"
+            break
+    else:
+        # 못 찾으면 맨 아래에 추가
+        lines.append(f"🔧 **보수 상태 :** {new_status}")
 
-    new_embed.description = new_description.strip()
+    new_embed.description = "\n".join(lines)
 
     await message.edit(embed=new_embed)
 
 
-class RepairStatusButton(View):
-    def __init__(self, defect_id: str, current_status: str):
-        super().__init__(timeout=None)
-        self.defect_id = defect_id
-        self.current_status = current_status
+from database import update_repair_status, get_defect_by_id
 
-    @discord.ui.button(label="보수 상태 변경", style=discord.ButtonStyle.primary)
-    async def change_status(self, interaction: discord.Interaction, button: Button):
-        
-        if self.current_status == "미처리":
-            next_status = "진행 중"
-        elif self.current_status == "진행 중":
-            next_status = "완료"
-        else:
-            next_status = "완료"
+class DefectDetailView(View):
+    def __init__(self, defect_id: str):
+        super().__init__(timeout=600)
+        self.defect_id = defect_id
+
+    async def _change_status(self, interaction: discord.Interaction, new_status: str):
+        record = await get_defect_by_id(self.defect_id)
+        if not record:
+            await interaction.response.send_message("❌ 손상 기록 조회 실패")
+            return
+
+        current = record.repair_status or "미처리"
+
+        allowed_next = {
+            "미처리": ["진행중"],
+            "진행중": ["완료"],
+            "완료": []
+        }
+        if new_status not in allowed_next.get(current, []):
             await interaction.response.send_message(
-                f"ℹ️ `{self.defect_id}`의 보수 공사는 이미 **완료**했습니다."
+                f"⚠️ 현재 상태가 **{current}**이므로 **{new_status}**(으)로 바로 변경할 수 없습니다.",
+                ephemeral=True
             )
             return
 
-        await update_repair_status(self.defect_id, next_status)
+        updated = await update_repair_status(self.defect_id, new_status)
+        if not updated:
+            await interaction.response.send_message("❌ 상태 업데이트 실패")
+            return
 
-        await edit_embed_repair_status(interaction.message, next_status)
-
-        self.current_status = next_status
+        # Embed 수정
+        await edit_embed_repair_status(interaction.message, new_status)
 
         await interaction.response.send_message(
-            f"🔧 `{self.defect_id}`의 보수 상태가 **{next_status}**(으)로 변경되었습니다!"
+            f"🔧 `{self.defect_id}`의 보수 공사를 **{new_status}** 상태로 변경했습니다!",
+            ephemeral=True
         )
+
+        if new_status == "완료":
+            for child in self.children:
+                child.disabled = True
+            await interaction.message.edit(view=self)
+
+    @discord.ui.button(label="진행중으로 변경", style=discord.ButtonStyle.primary)
+    async def to_in_progress(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._change_status(interaction, "진행중")
+
+    @discord.ui.button(label="완료로 변경", style=discord.ButtonStyle.success)
+    async def to_done(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._change_status(interaction, "완료")
 
 
 # ----- Google Calendar API 설정 -----

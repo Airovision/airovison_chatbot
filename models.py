@@ -21,6 +21,7 @@ class DefectCreate(BaseModel):
 class DefectPatch(BaseModel):
     defect_type: Optional[DefectType] = None
     urgency: Optional[Urgency] = None
+    repair_status: Optional[Repair_status] = None
 
 
 # ----- 조회/응답용 -----

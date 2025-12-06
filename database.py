@@ -57,7 +57,7 @@ async def create_defect_in_db(defect: DefectOut) -> Optional[DefectOut]:
         async with aiosqlite.connect(settings.DB_PATH) as db:
             await db.execute(sql, (
                 defect.id, defect.latitude, defect.longitude,
-                defect.image, defect.detect_time, defect.address
+                defect.image, defect.detect_time, defect.address, defect.repair_status
             ))
             await db.commit()
         return defect
@@ -89,13 +89,14 @@ async def patch_defect_in_db(defect_id: str, patch_data) -> Optional[DefectOut]:
             # 3. 변경된 내용으로 DB UPDATE
             sql = """
                   UPDATE defects
-                  SET defect_type = ?, urgency = ?, address = ?
+                  SET defect_type = ?, urgency = ?, address = ?, repair_status = ?
                   WHERE id = ?
                   """
             await db.execute(sql, (
                 updated_defect.defect_type,
                 updated_defect.urgency,
                 updated_defect.address,
+                updated_defect.repair_status or current_defect.repair_status,
                 updated_defect.id
             ))
             await db.commit()
@@ -167,10 +168,17 @@ async def delete_old_defects(days: int = 30):
 
 
 # ----- 보수 공사 상태 변경 -----
-async def update_repair_status(defect_id: str, status: str):
-    async with aiosqlite.connect(settings.DB_PATH) as db:
-        await db.execute(
-            "UPDATE defects SET repair_status = ? WHERE id = ?",
-            (status, defect_id)
-        )
-        await db.commit()
+async def get_defect_by_id(defect_id: str) -> Optional[DefectOut]:
+    try:
+        async with aiosqlite.connect(settings.DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM defects WHERE id = ?", (defect_id,)) as cursor:
+                row = await cursor.fetchone()
+                return db_row_to_model(row)
+    except aiosqlite.Error as e:
+        print(f"❌ get_defect_by_id 실패: {e}")
+        return None
+
+async def update_repair_status(defect_id: str, new_status: str) -> Optional[DefectOut]:
+    patch_data = DefectPatch(repair_status=new_status)
+    return await patch_defect_in_db(defect_id, patch_data)
