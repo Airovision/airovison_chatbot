@@ -15,7 +15,6 @@ _device = None
 # 손상 유형
 defect_type_choice = {
     "Concrete Crack" : "콘크리트 균열",
-    "Concrete Spalling" : "콘크리트 박리",
     "Paing Damage" : "도장 손상",
     "Rebar Exposure" : "철근 노출"
 }
@@ -109,7 +108,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     ==========================
 
     Classify the defect into exactly ONE of the following categories:
-    [Concrete Crack, Concrete Spalling, Paint Damage, Rebar Exposure, None]
+    [Concrete Crack, Paint Damage, Rebar Exposure, None]
     Use the following definitions and visual criteria strictly:
 
     1. Rebar Exposure:
@@ -137,7 +136,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     - Prefer to reserve Low or High rather than Medium.
     - reserve Medium only for genuinely unclear or borderline cases.
 
-    5. None:
+    4. None:
     - If the image does not match ANY of the above defect characteristics, classify as “None”.
     - Examples of NON-defects: window or door
     - Straight lines from structural elements must NOT be considered cracks.
@@ -148,7 +147,7 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     ===========================
     Return your answer ONLY in the following format:
 
-    1. Defect Type: <one of the five categories>
+    1. Defect Type: <one of the four categories>
     2. Urgency for Inspection: <Low, Medium, or High>
 
     Do not include any additional explanation.""")
@@ -192,7 +191,8 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
     }
 
     user_text = llava_questions.get(question, question) if question else (prompt_start).strip()
-    if device=="mps":
+    
+    if device=="mps": # 로컬용(맥북) 모델용 템플릿 문자열 생성
         messages = [{
             "role": "user",
             "content": [
@@ -201,11 +201,10 @@ def run_llava(image_path: str, question: str|None, defect_id: str|None, defect_t
             ],
         }]
 
-        # 모델용 템플릿 문자열 생성
         prompt_for_model = processor.apply_chat_template(
             messages, add_generation_prompt=True, tokenize=False
         )
-    elif device=="cuda":
+    elif device=="cuda": # 서버(aws)용
         prompt_for_model = (
             "USER: <image>\n"
             f"{user_text}\n"
