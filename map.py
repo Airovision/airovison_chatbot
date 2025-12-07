@@ -14,31 +14,25 @@ def get_address_from_coords(latitude, longitude):
         str: 변환된 도로명 주소. 실패 시 None.
     """
     
-    # 1. API 요청 URL
     api_url = "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc"
     
-    # 2. 요청 파라미터 설정(**coords는 '경도,위도' 순서)
     params = {
         "coords": f"{longitude},{latitude}",
         "orders": "roadaddr",
         "output": "json",
     }
     
-    # 3. 요청 헤더 설정
     headers = {
         "x-ncp-apigw-api-key-id": settings.NAVER_CLIENT_ID,
         "x-ncp-apigw-api-key": settings.NAVER_CLIENT_SECRET,
     }
     
     try:
-        # 4. API 호출
         response = requests.get(api_url, params=params, headers=headers)
         
-        # 5. 응답 확인
         if response.status_code == 200:
             data = response.json()
             
-            # 6. 응답 데이터 파싱
             if data['status']['code'] == 0:
                 results = data['results'][0]
                 

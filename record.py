@@ -18,6 +18,10 @@ from typing import List
 
 # ----- DB 연동 손상 기록 조회 -----
 def build_defect_detail_embed(record: DefectOut) -> discord.Embed:
+    """
+    DefectOut 객체를 기반으로 Embed 형태의 상세 정보를 생성합니다.
+    """
+
     risk = record.urgency or "분석 중"
     repair = record.repair_status or "미처리"
 
@@ -50,6 +54,10 @@ def build_defect_detail_embed(record: DefectOut) -> discord.Embed:
 
 
 class DefectSelect(discord.ui.Select):
+    """
+    전체 손상 기록 중 상세 정보를 확인할 손상 기록을 선택합니다.  
+    """
+
     def __init__(self, records: List[DefectOut]):
         options = []
         for r in records:
@@ -60,7 +68,7 @@ class DefectSelect(discord.ui.Select):
             options.append(SelectOption(label=label, description=desc[:100], value=r.id))
 
         super().__init__(
-            placeholder="상세 정보를 확인하고 보수 공사를 진행할 손상을 선택하세요",
+            placeholder="상세 정보를 확인하고 싶거나 보수 공사를 완료한 손상을 선택하세요",
             min_values=1,
             max_values=1,
             options=options
@@ -81,7 +89,6 @@ class DefectSelect(discord.ui.Select):
             view=view
         )
 
-
 class DefectSelectView(View):
     def __init__(self, records: List[DefectOut]):
         super().__init__(timeout=600)
@@ -89,6 +96,11 @@ class DefectSelectView(View):
 
 
 async def get_records(channel: discord.TextChannel):
+    """
+    탐지 시각으로부터 30일이 지나지 않은 모든 손상 기록을 Embed 형태로 조회합니다.
+    보수 공사가 긴급한 순으로 정렬하며, 상세 정보를 확인할 수 있는 Select 리스트도 함께 전송합니다.
+    """
+
     try:
         records: List[DefectOut] = await get_all_defects_from_db(sort_by_urgency=True)
     except Exception as e:
@@ -141,8 +153,7 @@ async def get_records(channel: discord.TextChannel):
 
 async def edit_embed_repair_status(message: discord.Message, new_status: str):
     """
-    주어진 메시지의 첫 번째 Embed에서
-    '🔧 보수 상태 :' 라인이 포함된 부분을 new_status로 교체하고, 메시지를 수정.
+    주어진 메시지의 Embed에서 보수 상태를 '완료'로 변경합니다.
     """
     if not message.embeds:
         return
@@ -165,6 +176,11 @@ async def edit_embed_repair_status(message: discord.Message, new_status: str):
 
 
 class DefectDetailView(View):
+    """
+    상세 조회 화면에서 보수 상태에 따라 버튼을 활성화하고,
+    버튼 클릭 시 보수 상태를 '완료'로 변경합니다. 
+    """
+    
     def __init__(self, record: DefectOut):
         super().__init__(timeout=600)
         self.record = record

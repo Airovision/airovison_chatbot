@@ -47,7 +47,7 @@ class QuestionView(View):
         self.urgency = urgency
         self.address = address
 
-    # Q1 버튼 - "이미지에 나타난 손상에 대해 분석 요약해주세요"
+    # Q1 - "이미지에 나타난 손상에 대해 분석 요약해주세요"
     @discord.ui.button(label=questions[1], style=discord.ButtonStyle.primary)
     async def q1(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")
@@ -60,7 +60,7 @@ class QuestionView(View):
         
         await interaction.followup.send(result)
 
-    # Q2 버튼 - "어떤 조치가 필요할지 조언해주세요"
+    # Q2 - "어떤 조치가 필요할지 조언해주세요"
     @discord.ui.button(label=questions[2], style=discord.ButtonStyle.primary)
     async def q2(self, interaction: discord.Interaction, button: Button):
         await interaction.channel.send(f"{interaction.user.mention}님이 **[{button.label}]** 버튼을 눌렀습니다.\n")

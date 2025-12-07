@@ -21,10 +21,10 @@ from s3_utils import upload_to_s3
 from dotenv import load_dotenv
 
 
-# .env 로드
 load_dotenv()
 
 
+# ----- 자동화 로직 -----
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("----- 데이터베이스 초기화 중 -----")

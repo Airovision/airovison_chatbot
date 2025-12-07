@@ -10,7 +10,7 @@ from config import settings
 # ----- 설정 -----
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
-DB_PATH = DATA_DIR / "defects.db" # 데이터베이스 파일 경로
+DB_PATH = DATA_DIR / "defects.db"
 
 
 # ----- 데이터베이스 초기화 -----
@@ -36,7 +36,7 @@ async def init_db():
         await db.commit()
 
 
-# ----- 헬퍼: DB 응답을 DefectOut 모델로 변환 -----
+# ----- DB 응답을 DefectOut 모델로 변환 -----
 def db_row_to_model(row: aiosqlite.Row) -> DefectOut:
     """
     SQLite Row 객체를 Pydantic 모델로 변환합니다.
@@ -73,7 +73,6 @@ async def patch_defect_in_db(defect_id: str, patch_data) -> Optional[DefectOut]:
         async with aiosqlite.connect(settings.DB_PATH) as db:
             db.row_factory = aiosqlite.Row
             
-            # 1. 수정할 현재 데이터를 먼저 조회
             async with db.execute("SELECT * FROM defects WHERE id = ?", (defect_id,)) as cursor:
                 current_row = await cursor.fetchone()
             
@@ -81,12 +80,10 @@ async def patch_defect_in_db(defect_id: str, patch_data) -> Optional[DefectOut]:
                 print(f"Defect ID '{defect_id}'를 찾을 수 없습니다.")
                 return None
             
-            # 2. Pydantic 모델로 데이터 병합
             current_defect = db_row_to_model(current_row)
             patch_dict = patch_data.model_dump(exclude_unset=True)
             updated_defect = current_defect.model_copy(update=patch_dict)
 
-            # 3. 변경된 내용으로 DB UPDATE
             sql = """
                   UPDATE defects
                   SET defect_type = ?, urgency = ?, address = ?, repair_status = ?
@@ -114,11 +111,8 @@ async def get_all_defects_from_db(sort_by_urgency: bool = False) -> List[DefectO
     sort_by_urgency=True 시, 'get_records'의 요구사항에 맞게 정렬합니다.
     """
     
-    # 1. 기본 쿼리
     sql = "SELECT * FROM defects"
 
-    # 2. 정렬 로직
-    #    "높음"(3) -> "중간"(2) -> "낮음"(1) 순서로 정렬
     if sort_by_urgency:
         sql += """
                ORDER BY

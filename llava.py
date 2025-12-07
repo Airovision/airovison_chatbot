@@ -1,30 +1,28 @@
-# python 코드로 LLaVA 실행하기
-import torch, textwrap, re # 라바 답변 줄바꿈
+import torch, textwrap, re
 from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 from PIL import Image
-from deep_translator import GoogleTranslator # 번역 라이브러리
+from deep_translator import GoogleTranslator
 from io import BytesIO
 import requests
 
-# LLaVA 모델 로드를 매번 하지 않도록 전역 변수로 선언 (한 번만 로드)
+
 _model = None
 _processor = None
 _device = None
 
 
-# 손상 유형
 defect_type_choice = {
     "Concrete Crack" : "콘크리트 균열",
     "Paing Damage" : "도장 손상",
     "Rebar Exposure" : "철근 노출"
 }
 
-# 위험도
 urgency_choice = {
     "High" : "높음",
     "Medium" : "보통",
     "Low" : "낮음"
 }
+
 
 def load_llava_model():
     global _model, _processor, _device
